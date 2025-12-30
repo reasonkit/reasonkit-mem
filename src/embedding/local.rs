@@ -10,22 +10,17 @@ use super::{
 use crate::{Error, Result};
 use async_trait::async_trait;
 use ort::{
-    environment::Environment,
-    execution_providers::ExecutionProvider,
-    session::{
-        builder::{GraphOptimizationLevel, SessionBuilder},
-        Session,
-    },
-    value::Value,
+    session::{builder::GraphOptimizationLevel, Session},
+    value::Tensor,
 };
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokenizers::Tokenizer;
 
 /// Local ONNX embedding provider
 pub struct LocalONNXEmbedding {
     config: EmbeddingConfig,
-    session: Session,
+    session: Mutex<Session>,
     tokenizer: Tokenizer,
     cache: Option<Arc<EmbeddingCache>>,
 }
@@ -45,20 +40,17 @@ impl LocalONNXEmbedding {
         let model_path = model_path.into();
         let tokenizer_path = tokenizer_path.into();
 
-        // Initialize ONNX Runtime environment
-        let environment = Environment::builder()
-            .with_name("reasonkit-embedding")
-            .build()
-            .map_err(|e| Error::embedding(format!("Failed to create ONNX environment: {}", e)))?;
+        // NOTE: `ort` environments are process-global; library crates shouldn't create their own.
+        // We'll rely on `ort`'s lazily initialized default environment.
 
         // Create session with optimizations
-        let session = SessionBuilder::new(&environment)
+        let session = Session::builder()
             .map_err(|e| Error::embedding(format!("Failed to create session builder: {}", e)))?
             .with_optimization_level(GraphOptimizationLevel::Level3)
             .map_err(|e| Error::embedding(format!("Failed to set optimization level: {}", e)))?
             .with_intra_threads(4)
             .map_err(|e| Error::embedding(format!("Failed to set intra threads: {}", e)))?
-            .with_model_from_file(&model_path)
+            .commit_from_file(&model_path)
             .map_err(|e| {
                 Error::embedding(format!(
                     "Failed to load ONNX model from {:?}: {}",
@@ -82,7 +74,7 @@ impl LocalONNXEmbedding {
 
         Ok(Self {
             config,
-            session,
+            session: Mutex::new(session),
             tokenizer,
             cache,
         })
@@ -158,45 +150,105 @@ impl LocalONNXEmbedding {
                 |e| Error::embedding(format!("Failed to create attention_mask array: {}", e)),
             )?;
 
-        // Run inference with ORT 2.0 API
-        let outputs = self
+        // Run inference (ORT 2.0 expects `SessionInputs` built from `SessionInputValue`s)
+        let input_ids_tensor = Tensor::from_array(input_ids_array)
+            .map_err(|e| Error::embedding(format!("Failed to create input_ids tensor: {}", e)))?;
+        let attention_mask_tensor = Tensor::from_array(attention_mask_array).map_err(|e| {
+            Error::embedding(format!("Failed to create attention_mask tensor: {}", e))
+        })?;
+
+        let mut session = self
             .session
-            .run([
-                Value::from_array(input_ids_array).map_err(|e| {
-                    Error::embedding(format!("Failed to create input_ids tensor: {}", e))
-                })?,
-                Value::from_array(attention_mask_array).map_err(|e| {
-                    Error::embedding(format!("Failed to create attention_mask tensor: {}", e))
-                })?,
-            ])
+            .lock()
+            .map_err(|_| Error::embedding("Failed to lock ONNX session"))?;
+
+        let outputs = session
+            .run(ort::inputs![input_ids_tensor, attention_mask_tensor])
             .map_err(|e| Error::embedding(format!("ONNX inference failed: {}", e)))?;
 
-        // Extract embeddings from output (ORT 2.0 API)
+        // Extract embeddings
         let embeddings_tensor = outputs
             .get("last_hidden_state")
             .or_else(|| outputs.get("output"))
-            .or_else(|| outputs.iter().next().map(|(_, v)| v))
+            .or_else(|| outputs.get("embeddings"))
+            .or_else(|| outputs.get("sentence_embedding"))
+            .or_else(|| {
+                if outputs.len() > 0 {
+                    Some(&outputs[0])
+                } else {
+                    None
+                }
+            })
             .ok_or_else(|| Error::embedding("No output from ONNX model"))?;
 
-        let embeddings_array: ndarray::ArrayView2<f32> = embeddings_tensor
-            .try_extract_tensor()
-            .map_err(|e| Error::embedding(format!("Failed to extract embeddings: {}", e)))?
-            .view()
-            .into_dimensionality()
-            .map_err(|e| Error::embedding(format!("Wrong embedding tensor shape: {}", e)))?;
+        // Many embedding models output either:
+        // - [batch, dim] pooled embeddings, or
+        // - [batch, seq_len, dim] token embeddings (we'll pool manually)
+        let embeddings_array = embeddings_tensor
+            .try_extract_array::<f32>()
+            .map_err(|e| Error::embedding(format!("Failed to extract embeddings: {}", e)))?;
 
         // Convert to Vec<Vec<f32>>
         let mut results = Vec::with_capacity(batch_size);
-        for i in 0..batch_size {
-            let embedding = embeddings_array.slice(ndarray::s![i, ..]).to_vec();
+        match embeddings_array.ndim() {
+            2 => {
+                // [batch, dim]
+                if embeddings_array.shape()[0] != batch_size {
+                    return Err(Error::embedding(format!(
+                        "Unexpected embedding batch size: expected {}, got {}",
+                        batch_size,
+                        embeddings_array.shape()[0]
+                    )));
+                }
 
-            let embedding = if self.config.normalize {
-                normalize_vector(&embedding)
-            } else {
-                embedding
-            };
+                for i in 0..batch_size {
+                    let embedding = embeddings_array.slice(ndarray::s![i, ..]).to_vec();
+                    let embedding = if self.config.normalize {
+                        normalize_vector(&embedding)
+                    } else {
+                        embedding
+                    };
+                    results.push(embedding);
+                }
+            }
+            3 => {
+                // [batch, seq_len, dim] -> mean pool over seq_len
+                if embeddings_array.shape()[0] != batch_size {
+                    return Err(Error::embedding(format!(
+                        "Unexpected embedding batch size: expected {}, got {}",
+                        batch_size,
+                        embeddings_array.shape()[0]
+                    )));
+                }
 
-            results.push(embedding);
+                // Safe: we already checked ndim == 3
+                let token_embeddings: ndarray::ArrayView3<'_, f32> =
+                    embeddings_array.into_dimensionality().map_err(|e| {
+                        Error::embedding(format!("Wrong embedding tensor shape: {}", e))
+                    })?;
+
+                for i in 0..batch_size {
+                    let tokens = token_embeddings.slice(ndarray::s![i, .., ..]); // [seq_len, dim]
+                    let pooled = tokens.mean_axis(ndarray::Axis(0)).ok_or_else(|| {
+                        Error::embedding("Failed to pool embeddings: empty sequence")
+                    })?;
+                    let embedding = pooled.to_vec();
+
+                    let embedding = if self.config.normalize {
+                        normalize_vector(&embedding)
+                    } else {
+                        embedding
+                    };
+
+                    results.push(embedding);
+                }
+            }
+            other => {
+                return Err(Error::embedding(format!(
+                    "Unexpected embedding tensor dimensionality: {}",
+                    other
+                )));
+            }
         }
 
         Ok(results)

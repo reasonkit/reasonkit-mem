@@ -41,6 +41,7 @@
 #![warn(clippy::all)]
 #![allow(dead_code)]
 #![allow(unused_imports)]
+#![cfg_attr(feature = "python", allow(clippy::useless_conversion))]
 
 // Re-export commonly used types
 pub use error::{MemError, MemResult};
@@ -125,8 +126,6 @@ mod tests {
 #[cfg(feature = "python")]
 use crate::raptor::optimized::{OptimizedRaptorTree, RaptorOptConfig};
 #[cfg(feature = "python")]
-use crate::types::Chunk;
-#[cfg(feature = "python")]
 use pyo3::prelude::*;
 #[cfg(feature = "python")]
 use std::sync::Arc;
@@ -168,6 +167,7 @@ impl PyRaptorTree {
         })
     }
 
+    #[allow(clippy::useless_conversion)]
     fn ingest_documents(
         &self,
         py: Python<'_>,
@@ -230,6 +230,7 @@ impl PyRaptorTree {
         })
     }
 
+    #[allow(clippy::useless_conversion)]
     fn query(
         &self,
         py: Python<'_>,

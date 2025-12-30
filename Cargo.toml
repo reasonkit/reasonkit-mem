@@ -86,7 +86,7 @@ ort = { version = "2.0.0-rc.10", optional = true }
 tokenizers = { version = "0.19", optional = true }
 
 # NDArray for tensor operations
-ndarray = { version = "0.15", optional = true }
+ndarray = { version = "0.16", optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"

@@ -1,4 +1,5 @@
 use anyhow::Result;
+#[allow(deprecated)]
 use qdrant_client::prelude::*;
 use std::collections::HashMap;
 use tantivy::collector::TopDocs;
