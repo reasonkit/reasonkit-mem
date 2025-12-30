@@ -160,6 +160,11 @@ impl MemError {
     pub fn query(msg: impl Into<String>) -> Self {
         MemError::Retrieval(msg.into())
     }
+
+    /// Create a generation error (for summarization/LLM generation)
+    pub fn generation(msg: impl Into<String>) -> Self {
+        MemError::Retrieval(msg.into())
+    }
 }
 
 #[cfg(test)]

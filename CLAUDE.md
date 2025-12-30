@@ -4,7 +4,7 @@
 > "The Long-Term Memory Layer"
 
 **LICENSE:** Apache 2.0
-**STATUS:** Active Development (extracted from reasonkit-core)
+**STATUS:** Stable (Migration Complete - 2025-12-29)
 **REPOSITORY:** https://github.com/ReasonKit/reasonkit-mem
 
 ---
@@ -107,8 +107,110 @@ let results = retriever.search("query", &RetrievalConfig::default()).await?;
 |------|--------|-------|
 | **Build** | ✅ PASS | `cargo build --release` |
 | **Clippy** | ✅ PASS | No warnings |
-| **Tests** | ✅ PASS | 49 tests passing |
+| **Tests** | ✅ PASS | 54 tests passing |
 | **Format** | ✅ PASS | `cargo fmt --check` |
+
+---
+
+## TASK MANAGEMENT (MANDATORY - CONS-007)
+
+> **Axiom:** No work exists without task tracking. ALL AI agents MUST use the full task system.
+
+### Taskwarrior Integration
+
+**ALL AI agents MUST use Taskwarrior for task tracking.**
+
+```bash
+# Create task (MANDATORY format for RK-PROJECT)
+task add project:rk-project.mem.{component} "{description}" priority:{H|M|L} due:{date} +{tags}
+
+# Examples:
+task add project:rk-project.mem.storage "Optimize Qdrant embedded mode" priority:H due:today +rust +performance
+task add project:rk-project.mem.retrieval "Implement RRF fusion" priority:M due:friday +search
+task add project:rk-project.mem.raptor "Build RAPTOR tree structure" priority:M due:tomorrow +rag
+
+# Start working (CRITICAL: Auto-starts timewarrior!)
+task {id} start
+
+# Stop working (pauses time tracking)
+task {id} stop
+
+# Complete task (stops timewarrior, records completion)
+task {id} done
+
+# Add annotations (progress notes, decisions, blockers)
+task {id} annotate "Completed hybrid search implementation, 20% improvement in recall"
+task {id} annotate "BLOCKED: Waiting for Qdrant 1.10 release"
+task {id} annotate "DECISION: Using Tantivy for BM25 over alternatives"
+
+# View status
+task project:rk-project.mem list
+task project:rk-project.mem summary
+timew summary :week
+```
+
+**Components:**
+- `mem.storage` → Qdrant vector storage
+- `mem.retrieval` → Hybrid search, fusion, reranking
+- `mem.raptor` → RAPTOR hierarchical trees
+- `mem.embedding` → Embedding services (BGE-M3, OpenAI)
+- `mem.indexing` → BM25/Tantivy sparse indexing
+
+**Full Documentation:** See `ORCHESTRATOR.md` for complete Taskwarrior reference.
+
+---
+
+## MCP SERVERS, SKILLS & PLUGINS (MAXIMIZE)
+
+### MCP Server Usage
+
+**Agents MUST leverage MCP servers for all compatible operations.**
+
+```yaml
+MCP_SERVERS_PRIORITY:
+  - sequential-thinking   # ALWAYS use for complex reasoning chains
+  - filesystem            # File operations
+  - github               # Repository operations
+  - memory               # Persistent memory
+  - puppeteer            # Web automation
+  - fetch                # HTTP requests with caching
+
+USAGE_PATTERN:
+  1. Check if MCP server exists for operation
+  2. If yes: USE IT (preferred over direct implementation)
+  3. If no: Implement in Rust, consider creating MCP server
+```
+
+### Skills & Plugins
+
+```yaml
+SKILLS_MAXIMIZATION:
+  - Use pdf skill for PDF operations
+  - Use xlsx skill for spreadsheet operations
+  - Use docx skill for document operations
+  - Use frontend-design skill for UI work
+  - Use mcp-builder skill for MCP server creation
+
+PLUGIN_PRIORITY:
+  - api-contract-sync for API validation
+  - math for deterministic calculations
+  - experienced-engineer agents for specialized tasks
+```
+
+### Extensions
+
+```yaml
+BROWSER_EXTENSIONS:
+  - Use when web research needed
+  - Prefer official provider extensions
+
+IDE_EXTENSIONS:
+  - Cursor: .cursorrules enforcement
+  - VS Code: copilot-instructions.md
+  - Windsurf: .windsurfrules
+```
+
+**Full Reference:** See [ORCHESTRATOR.md](../../ORCHESTRATOR.md#mcp-servers-skills--plugins-maximize) for complete MCP/Skills/Plugins documentation.
 
 ---
 
@@ -124,4 +226,4 @@ let results = retriever.search("query", &RetrievalConfig::default()).await?;
 ---
 
 *reasonkit-mem v0.1.0 | Memory Infrastructure | Apache 2.0*
-*Extracted from reasonkit-core: 2025-12-25*
+*Migration Complete: 2025-12-29 | Ready for crates.io publication*

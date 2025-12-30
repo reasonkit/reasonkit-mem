@@ -2,7 +2,10 @@
 //!
 //! Implements hierarchical clustering and summarization for improved retrieval quality.
 
+pub mod optimized;
+
 use crate::{Chunk, Error, Result};
+pub use optimized::{OptimizedRaptorTree, RaptorOptConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;

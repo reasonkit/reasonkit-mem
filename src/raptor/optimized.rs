@@ -6,7 +6,7 @@
 //! - Parallel clustering
 //! - Early termination pruning
 
-use crate::{Document, Chunk, Result, Error};
+use crate::{Chunk, Document, Error, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
@@ -91,8 +91,8 @@ impl OptimizedRaptorTree {
     pub async fn build_from_chunks(
         &mut self,
         chunks: &[Chunk],
-        embedder: &dyn Fn(&str) -> Result<Vec<f32>>,
-        summarizer: &dyn Fn(&str) -> Result<String>,
+        embedder: &(dyn Fn(&str) -> Result<Vec<f32>> + Sync + Send),
+        summarizer: &(dyn Fn(&str) -> Result<String> + Sync + Send),
     ) -> Result<()> {
         if chunks.is_empty() {
             return Ok(());
@@ -112,9 +112,11 @@ impl OptimizedRaptorTree {
             }
 
             let next_level_nodes = if self.config.parallel_clustering {
-                self.build_level_parallel(&current_level_nodes, level, embedder, summarizer).await?
+                self.build_level_parallel(&current_level_nodes, level, embedder, summarizer)
+                    .await?
             } else {
-                self.build_level_sequential(&current_level_nodes, level, embedder, summarizer).await?
+                self.build_level_sequential(&current_level_nodes, level, embedder, summarizer)
+                    .await?
             };
 
             current_level_nodes = next_level_nodes;
@@ -132,7 +134,7 @@ impl OptimizedRaptorTree {
     async fn create_leaf_nodes(
         &mut self,
         chunks: &[Chunk],
-        embedder: &dyn Fn(&str) -> Result<Vec<f32>>,
+        embedder: &(dyn Fn(&str) -> Result<Vec<f32>> + Sync + Send),
     ) -> Result<Vec<OptimizedRaptorNode>> {
         let mut leaf_nodes = Vec::new();
 
@@ -165,8 +167,8 @@ impl OptimizedRaptorTree {
         &mut self,
         nodes: &[OptimizedRaptorNode],
         level: usize,
-        embedder: &dyn Fn(&str) -> Result<Vec<f32>>,
-        summarizer: &dyn Fn(&str) -> Result<String>,
+        embedder: &(dyn Fn(&str) -> Result<Vec<f32>> + Sync + Send),
+        summarizer: &(dyn Fn(&str) -> Result<String> + Sync + Send),
     ) -> Result<Vec<OptimizedRaptorNode>> {
         let mut next_level_nodes = Vec::new();
 
@@ -186,25 +188,51 @@ impl OptimizedRaptorTree {
         &mut self,
         nodes: &[OptimizedRaptorNode],
         level: usize,
-        embedder: &dyn Fn(&str) -> Result<Vec<f32>>,
-        summarizer: &dyn Fn(&str) -> Result<String>,
+        embedder: &(dyn Fn(&str) -> Result<Vec<f32>> + Sync + Send),
+        summarizer: &(dyn Fn(&str) -> Result<String> + Sync + Send),
     ) -> Result<Vec<OptimizedRaptorNode>> {
         use rayon::prelude::*;
 
-        let clusters: Vec<_> = (0..nodes.len())
-            .step_by(self.config.cluster_size)
-            .collect();
+        let clusters: Vec<_> = (0..nodes.len()).step_by(self.config.cluster_size).collect();
 
+        // Use the pure static function for parallel execution
         let next_level_nodes: Result<Vec<_>> = clusters
             .par_iter()
             .map(|&i| {
                 let cluster_end = (i + self.config.cluster_size).min(nodes.len());
                 let cluster = &nodes[i..cluster_end];
-                self.create_cluster_node(cluster, level, embedder, summarizer)
+
+                Self::create_cluster_node_pure(
+                    cluster,
+                    level,
+                    embedder,
+                    summarizer,
+                    self.config.cache_size,
+                    &self.embedding_cache,
+                    &self.access_order,
+                )
             })
             .collect();
 
-        next_level_nodes
+        let new_nodes = next_level_nodes?;
+
+        // Post-processing: Insert nodes and update parent pointers
+        // This must be done sequentially as we are modifying `self.nodes`
+        let mut result_nodes = Vec::new();
+        for node in new_nodes {
+            // We need to re-establish the parent links in the main `self.nodes`
+            let node_id = node.id;
+            for child_id in &node.children {
+                if let Some(child_node) = self.nodes.get_mut(child_id) {
+                    child_node.parent = Some(node_id);
+                }
+            }
+
+            self.nodes.insert(node_id, node.clone());
+            result_nodes.push(node);
+        }
+
+        Ok(result_nodes)
     }
 
     /// Create a cluster node from a group of nodes
@@ -212,8 +240,42 @@ impl OptimizedRaptorTree {
         &mut self,
         cluster: &[OptimizedRaptorNode],
         level: usize,
-        embedder: &dyn Fn(&str) -> Result<Vec<f32>>,
-        summarizer: &dyn Fn(&str) -> Result<String>,
+        embedder: &(dyn Fn(&str) -> Result<Vec<f32>> + Sync + Send),
+        summarizer: &(dyn Fn(&str) -> Result<String> + Sync + Send),
+    ) -> Result<OptimizedRaptorNode> {
+        // Reuse pure implementation for consistency, but we still need to do the parent update
+        // We can just call pure and then do the update.
+        let node = Self::create_cluster_node_pure(
+            cluster,
+            level,
+            embedder,
+            summarizer,
+            self.config.cache_size,
+            &self.embedding_cache,
+            &self.access_order,
+        )?;
+
+        // Update parent references
+        for child in cluster {
+            if let Some(child_node) = self.nodes.get_mut(&child.id) {
+                child_node.parent = Some(node.id);
+            }
+        }
+
+        self.nodes.insert(node.id, node.clone());
+        Ok(node)
+    }
+
+    /// Pure version of create_cluster_node for parallel execution
+    /// Does not modify self.nodes, so it is safe to call in parallel
+    fn create_cluster_node_pure(
+        cluster: &[OptimizedRaptorNode],
+        level: usize,
+        embedder: &(dyn Fn(&str) -> Result<Vec<f32>> + Sync + Send),
+        summarizer: &(dyn Fn(&str) -> Result<String> + Sync + Send),
+        cache_size: usize,
+        embedding_cache: &Arc<RwLock<HashMap<Uuid, Vec<f32>>>>,
+        access_order: &Arc<RwLock<Vec<Uuid>>>,
     ) -> Result<OptimizedRaptorNode> {
         if cluster.len() == 1 {
             let mut node = cluster[0].clone();
@@ -222,9 +284,7 @@ impl OptimizedRaptorTree {
         }
 
         // Create summary
-        let cluster_texts: Vec<String> = cluster.iter()
-            .map(|n| n.text.clone())
-            .collect();
+        let cluster_texts: Vec<String> = cluster.iter().map(|n| n.text.clone()).collect();
         let combined_text = cluster_texts.join("\n\n");
 
         let summary = summarizer(&combined_text)?;
@@ -232,8 +292,31 @@ impl OptimizedRaptorTree {
 
         let cluster_node_id = Uuid::new_v4();
 
-        // Cache embedding
-        self.cache_embedding(cluster_node_id, embedding.clone());
+        // Cache embedding directly using the locks
+        {
+            if let Ok(mut cache) = embedding_cache.write() {
+                // Evict if over capacity
+                while cache.len() >= cache_size {
+                    if let Ok(mut order) = access_order.write() {
+                        if let Some(oldest_id) = order.first().cloned() {
+                            order.remove(0);
+                            cache.remove(&oldest_id);
+                        } else {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+
+                cache.insert(cluster_node_id, embedding.clone());
+
+                // Update access order
+                if let Ok(mut order) = access_order.write() {
+                    order.push(cluster_node_id);
+                }
+            }
+        }
 
         let cluster_node = OptimizedRaptorNode {
             id: cluster_node_id,
@@ -246,25 +329,13 @@ impl OptimizedRaptorTree {
             last_accessed: Some(std::time::Instant::now()),
         };
 
-        // Update parent references
-        for child in cluster {
-            if let Some(child_node) = self.nodes.get_mut(&child.id) {
-                child_node.parent = Some(cluster_node_id);
-            }
-        }
-
-        self.nodes.insert(cluster_node.id, cluster_node.clone());
         Ok(cluster_node)
     }
 
     /// Beam search through the tree
     ///
     /// More efficient than exhaustive search - only explores top-k most promising paths
-    pub fn search_beam(
-        &self,
-        query_embedding: &[f32],
-        top_k: usize,
-    ) -> Result<Vec<(Uuid, f32)>> {
+    pub fn search_beam(&self, query_embedding: &[f32], top_k: usize) -> Result<Vec<(Uuid, f32)>> {
         let mut beam: Vec<(Uuid, f32)> = Vec::new();
 
         // Initialize beam with root nodes
@@ -296,7 +367,7 @@ impl OptimizedRaptorTree {
                 if let Some(node) = self.nodes.get(node_id) {
                     if node.level == 0 {
                         // Already at leaf level
-                        next_beam.push((*node_id, _parent_score));
+                        next_beam.push((*node_id, *_parent_score));
                         continue;
                     }
 
@@ -391,9 +462,7 @@ impl OptimizedRaptorTree {
             }
         }
 
-        let cache_size = self.embedding_cache.read()
-            .map(|c| c.len())
-            .unwrap_or(0);
+        let cache_size = self.embedding_cache.read().map(|c| c.len()).unwrap_or(0);
 
         RaptorOptStats {
             total_nodes: self.nodes.len(),
@@ -445,7 +514,10 @@ mod tests {
     }
 
     fn mock_summarizer(text: &str) -> Result<String> {
-        Ok(format!("Summary: {}", text.chars().take(50).collect::<String>()))
+        Ok(format!(
+            "Summary: {}",
+            text.chars().take(50).collect::<String>()
+        ))
     }
 
     #[tokio::test]
@@ -484,7 +556,9 @@ mod tests {
             },
         ];
 
-        tree.build_from_chunks(&chunks, &mock_embedder, &mock_summarizer).await.unwrap();
+        tree.build_from_chunks(&chunks, &mock_embedder, &mock_summarizer)
+            .await
+            .unwrap();
 
         let query_embedding = vec![0.1, 0.2, 0.3, 0.4, 0.5];
         let results = tree.search_beam(&query_embedding, 5).unwrap();

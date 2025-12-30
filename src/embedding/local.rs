@@ -9,7 +9,15 @@ use super::{
 };
 use crate::{Error, Result};
 use async_trait::async_trait;
-use ort::{Environment, ExecutionProvider, Session, SessionBuilder, Value};
+use ort::{
+    environment::Environment,
+    execution_providers::ExecutionProvider,
+    session::{
+        builder::{GraphOptimizationLevel, SessionBuilder},
+        Session,
+    },
+    value::Value,
+};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokenizers::Tokenizer;
@@ -46,7 +54,7 @@ impl LocalONNXEmbedding {
         // Create session with optimizations
         let session = SessionBuilder::new(&environment)
             .map_err(|e| Error::embedding(format!("Failed to create session builder: {}", e)))?
-            .with_optimization_level(ort::GraphOptimizationLevel::Level3)
+            .with_optimization_level(GraphOptimizationLevel::Level3)
             .map_err(|e| Error::embedding(format!("Failed to set optimization level: {}", e)))?
             .with_intra_threads(4)
             .map_err(|e| Error::embedding(format!("Failed to set intra threads: {}", e)))?
@@ -150,29 +158,32 @@ impl LocalONNXEmbedding {
                 |e| Error::embedding(format!("Failed to create attention_mask array: {}", e)),
             )?;
 
-        // Run inference
+        // Run inference with ORT 2.0 API
         let outputs = self
             .session
-            .run(vec![
-                Value::from_array(self.session.allocator(), &input_ids_array).map_err(|e| {
+            .run([
+                Value::from_array(input_ids_array).map_err(|e| {
                     Error::embedding(format!("Failed to create input_ids tensor: {}", e))
                 })?,
-                Value::from_array(self.session.allocator(), &attention_mask_array).map_err(
-                    |e| Error::embedding(format!("Failed to create attention_mask tensor: {}", e)),
-                )?,
+                Value::from_array(attention_mask_array).map_err(|e| {
+                    Error::embedding(format!("Failed to create attention_mask tensor: {}", e))
+                })?,
             ])
             .map_err(|e| Error::embedding(format!("ONNX inference failed: {}", e)))?;
 
-        // Extract embeddings from output
+        // Extract embeddings from output (ORT 2.0 API)
         let embeddings_tensor = outputs
-            .get(0)
+            .get("last_hidden_state")
+            .or_else(|| outputs.get("output"))
+            .or_else(|| outputs.iter().next().map(|(_, v)| v))
             .ok_or_else(|| Error::embedding("No output from ONNX model"))?;
 
-        let embeddings_array = embeddings_tensor
-            .try_extract::<f32>()
+        let embeddings_array: ndarray::ArrayView2<f32> = embeddings_tensor
+            .try_extract_tensor()
             .map_err(|e| Error::embedding(format!("Failed to extract embeddings: {}", e)))?
             .view()
-            .to_owned();
+            .into_dimensionality()
+            .map_err(|e| Error::embedding(format!("Wrong embedding tensor shape: {}", e)))?;
 
         // Convert to Vec<Vec<f32>>
         let mut results = Vec::with_capacity(batch_size);

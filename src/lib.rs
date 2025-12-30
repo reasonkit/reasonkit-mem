@@ -120,3 +120,146 @@ mod tests {
         assert!(true);
     }
 }
+
+// Python Bindings Infrastructure
+#[cfg(feature = "python")]
+use crate::raptor::optimized::{OptimizedRaptorTree, RaptorOptConfig};
+#[cfg(feature = "python")]
+use crate::types::Chunk;
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+#[cfg(feature = "python")]
+use std::sync::Arc;
+#[cfg(feature = "python")]
+use tokio::sync::Mutex;
+
+#[cfg(feature = "python")]
+#[pyclass(name = "RaptorTree")]
+pub struct PyRaptorTree {
+    inner: Arc<Mutex<OptimizedRaptorTree>>,
+    rt: Arc<tokio::runtime::Runtime>,
+}
+
+#[cfg(feature = "python")]
+#[pymethods]
+impl PyRaptorTree {
+    #[new]
+    #[pyo3(signature = (max_depth=None, cluster_size=None))]
+    fn new(max_depth: Option<usize>, cluster_size: Option<usize>) -> PyResult<Self> {
+        let mut config = RaptorOptConfig::default();
+        if let Some(d) = max_depth {
+            config.max_depth = d;
+        }
+        if let Some(c) = cluster_size {
+            config.cluster_size = c;
+        }
+
+        let tree = OptimizedRaptorTree::new(config);
+
+        // Create a runtime for this instance
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+
+        Ok(PyRaptorTree {
+            inner: Arc::new(Mutex::new(tree)),
+            rt: Arc::new(rt),
+        })
+    }
+
+    fn ingest_documents(
+        &self,
+        py: Python<'_>,
+        documents: Vec<String>,
+        embed_fn: PyObject,
+        summarize_fn: PyObject,
+    ) -> PyResult<()> {
+        let chunks: Vec<Chunk> = documents
+            .into_iter()
+            .enumerate()
+            .map(|(i, text)| Chunk {
+                id: uuid::Uuid::new_v4(),
+                text,
+                index: i,
+                start_char: 0,
+                end_char: 0,
+                token_count: None,
+                section: None,
+                page: None,
+                embedding_ids: Default::default(),
+            })
+            .collect();
+
+        // Capture for async block
+        let inner = self.inner.clone();
+        let embed_fn = embed_fn.clone_ref(py);
+        let summarize_fn = summarize_fn.clone_ref(py);
+        let rt = self.rt.clone();
+
+        // Release GIL to allow threading/async
+        py.allow_threads(move || {
+            rt.block_on(async move {
+                let mut tree = inner.lock().await;
+
+                // Callbacks that re-acquire GIL
+                let embedder = |text: &str| -> crate::Result<Vec<f32>> {
+                    Python::with_gil(|py| {
+                        let res = embed_fn
+                            .call1(py, (text,))
+                            .map_err(|e| crate::MemError::embedding(e.to_string()))?;
+                        res.extract::<Vec<f32>>(py)
+                            .map_err(|e| crate::MemError::embedding(e.to_string()))
+                    })
+                };
+
+                let summarizer = |text: &str| -> crate::Result<String> {
+                    Python::with_gil(|py| {
+                        let res = summarize_fn
+                            .call1(py, (text,))
+                            .map_err(|e| crate::MemError::generation(e.to_string()))?;
+                        res.extract::<String>(py)
+                            .map_err(|e| crate::MemError::generation(e.to_string()))
+                    })
+                };
+
+                tree.build_from_chunks(&chunks, &embedder, &summarizer)
+                    .await
+            })
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+        })
+    }
+
+    fn query(
+        &self,
+        py: Python<'_>,
+        vector: Vec<f32>,
+        top_k: usize,
+    ) -> PyResult<Vec<(String, f32)>> {
+        let inner = self.inner.clone();
+        let rt = self.rt.clone();
+
+        py.allow_threads(move || {
+            rt.block_on(async move {
+                let tree = inner.lock().await;
+                // search_beam is synchronous but we access it within the async lock
+                let results = tree.search_beam(&vector, top_k).map_err(|e| {
+                    PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
+                })?;
+
+                // Convert UUIDs to strings
+                Ok(results
+                    .into_iter()
+                    .map(|(uuid, score)| (uuid.to_string(), score))
+                    .collect())
+            })
+        })
+    }
+}
+
+#[cfg(feature = "python")]
+#[pymodule]
+fn reasonkit_mem(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyRaptorTree>()?;
+    Ok(())
+}

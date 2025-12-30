@@ -24,6 +24,23 @@ tokio = { version = "1", features = ["full"] }
 
 ## Usage
 
+### Basic Usage (Embedded Mode)
+
+```rust
+use reasonkit_mem::storage::Storage;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // Create embedded storage (automatic file storage fallback)
+    let storage = Storage::new_embedded().await?;
+
+    // Use storage...
+    Ok(())
+}
+```
+
+### Advanced Usage (Custom Configuration)
+
 ```rust
 use reasonkit_mem::{
     storage::{Storage, EmbeddedStorageConfig},
@@ -31,15 +48,24 @@ use reasonkit_mem::{
     retrieval::HybridRetriever,
     Document, RetrievalConfig,
 };
+use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Create storage backend
-    let config = EmbeddedStorageConfig::default();
-    let storage = Storage::new_embedded(config).await?;
+    // Create storage with custom config
+    let config = EmbeddedStorageConfig::file_only(PathBuf::from("./data"));
+    let storage = Storage::new_embedded_with_config(config).await?;
+
+    // Or use Qdrant (requires running server)
+    let qdrant_config = EmbeddedStorageConfig::with_qdrant(
+        "http://localhost:6333",
+        "my_collection",
+        1536,
+    );
+    let storage = Storage::new_embedded_with_config(qdrant_config).await?;
 
     // Index documents
-    storage.store_document(&doc).await?;
+    storage.store_document(&doc, &context).await?;
 
     // Hybrid search
     let retriever = HybridRetriever::new(storage.clone());
@@ -48,6 +74,10 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 ```
+
+### Embedded Mode Documentation
+
+For detailed information about embedded mode, see [docs/EMBEDDED_MODE_GUIDE.md](docs/EMBEDDED_MODE_GUIDE.md).
 
 ## Architecture
 

@@ -16,8 +16,28 @@ categories = ["science", "text-processing", "database"]
 [lib]
 name = "reasonkit_mem"
 path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[[bench]]
+name = "raptor_bench"
+harness = false
+
+[[bench]]
+name = "embedding_bench"
+harness = false
+
+[[bench]]
+name = "fusion_bench"
+harness = false
+
+[[bench]]
+name = "rerank_bench"
+harness = false
 
 [dependencies]
+# Python Bindings
+pyo3 = { version = "0.22", features = ["extension-module"], optional = true }
+
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -72,7 +92,9 @@ ndarray = { version = "0.15", optional = true }
 tokio-test = "0.4"
 tempfile = "3.10"
 pretty_assertions = "1.4"
+criterion = { version = "0.5", features = ["async_tokio"] }
 
 [features]
 default = []
+python = ["pyo3"]
 local-embeddings = ["ort", "tokenizers", "ndarray"]

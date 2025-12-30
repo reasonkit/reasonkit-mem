@@ -1380,6 +1380,43 @@ impl Storage {
         })
     }
 
+    /// Create embedded storage with automatic configuration
+    ///
+    /// This is a convenience method that uses `create_embedded_storage()` with default config.
+    /// It will automatically use file storage (no Qdrant required).
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use reasonkit_mem::storage::Storage;
+    ///
+    /// # async fn example() -> anyhow::Result<()> {
+    /// let storage = Storage::new_embedded().await?;
+    /// // Use storage...
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn new_embedded() -> Result<Self> {
+        create_embedded_storage(EmbeddedStorageConfig::default()).await
+    }
+
+    /// Create embedded storage with custom configuration
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use reasonkit_mem::storage::{Storage, EmbeddedStorageConfig};
+    /// use std::path::PathBuf;
+    ///
+    /// # async fn example() -> anyhow::Result<()> {
+    /// let config = EmbeddedStorageConfig::file_only(PathBuf::from("./data"));
+    /// let storage = Storage::new_embedded_with_config(config).await?;
+    /// // Use storage...
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn new_embedded_with_config(config: EmbeddedStorageConfig) -> Result<Self> {
+        create_embedded_storage(config).await
+    }
+
     /// Create storage with Qdrant backend
     pub async fn qdrant(
         host: &str,
@@ -1584,13 +1621,10 @@ pub async fn create_embedded_storage(config: EmbeddedStorageConfig) -> Result<St
             Ok(()) => {
                 tracing::info!(url = %config.qdrant_url, "Connected to Qdrant server");
                 // Parse URL for host and port
-                let url = config.qdrant_url.trim_start_matches("http://");
-                let parts: Vec<&str> = url.split(':').collect();
-                let host = parts.first().unwrap_or(&"localhost");
-                let port: u16 = parts.get(1).and_then(|p| p.parse().ok()).unwrap_or(6333);
+                let (host, port) = parse_qdrant_url(&config.qdrant_url);
 
                 return Storage::qdrant(
-                    host,
+                    &host,
                     port,
                     port + 1, // gRPC port typically port + 1
                     config.collection_name,
@@ -1602,6 +1636,7 @@ pub async fn create_embedded_storage(config: EmbeddedStorageConfig) -> Result<St
             Err(e) => {
                 tracing::warn!(
                     error = %e,
+                    url = %config.qdrant_url,
                     "Qdrant not available, require_qdrant=true will fail"
                 );
                 return Err(Error::io(format!(
@@ -1618,13 +1653,32 @@ pub async fn create_embedded_storage(config: EmbeddedStorageConfig) -> Result<St
 }
 
 /// Check if Qdrant server is healthy
+///
+/// This function checks if a Qdrant server is running and accessible at the given URL.
+/// It uses the `/readyz` endpoint which is Qdrant's health check endpoint.
+///
+/// # Arguments
+/// * `url` - Base URL of the Qdrant server (e.g., "http://localhost:6333")
+///
+/// # Returns
+/// * `Ok(())` if Qdrant is healthy and accessible
+/// * `Err(Error)` if Qdrant is not accessible or unhealthy
 async fn check_qdrant_health(url: &str) -> Result<()> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
         .build()
         .map_err(|e| Error::io(format!("Failed to create HTTP client: {}", e)))?;
 
-    let health_url = format!("{}/readyz", url);
+    // Normalize URL (remove trailing slash, ensure http:// prefix)
+    let normalized_url = url.trim_end_matches('/');
+    let base_url =
+        if normalized_url.starts_with("http://") || normalized_url.starts_with("https://") {
+            normalized_url.to_string()
+        } else {
+            format!("http://{}", normalized_url)
+        };
+
+    let health_url = format!("{}/readyz", base_url);
     let response = client
         .get(&health_url)
         .send()
@@ -1632,6 +1686,7 @@ async fn check_qdrant_health(url: &str) -> Result<()> {
         .map_err(|e| Error::io(format!("Qdrant health check failed: {}", e)))?;
 
     if response.status().is_success() {
+        tracing::debug!(url = %base_url, "Qdrant health check passed");
         Ok(())
     } else {
         Err(Error::io(format!(
@@ -1639,6 +1694,33 @@ async fn check_qdrant_health(url: &str) -> Result<()> {
             response.status()
         )))
     }
+}
+
+/// Parse Qdrant URL into host and port
+///
+/// Handles various URL formats:
+/// - `http://localhost:6333`
+/// - `localhost:6333`
+/// - `localhost`
+/// - `127.0.0.1:6333`
+///
+/// # Arguments
+/// * `url` - Qdrant URL string
+///
+/// # Returns
+/// * `(host, port)` tuple
+fn parse_qdrant_url(url: &str) -> (String, u16) {
+    // Remove http:// or https:// prefix
+    let url = url
+        .trim_start_matches("http://")
+        .trim_start_matches("https://");
+
+    // Split by colon to get host and port
+    let parts: Vec<&str> = url.split(':').collect();
+    let host = parts.first().unwrap_or(&"localhost").to_string();
+    let port: u16 = parts.get(1).and_then(|p| p.parse().ok()).unwrap_or(6333); // Default Qdrant port
+
+    (host, port)
 }
 
 /// Get the default storage path for embedded mode
@@ -1755,6 +1837,90 @@ mod tests {
 
         let stats = storage.stats(&context).await.unwrap();
         assert_eq!(stats.document_count, 0);
+
+        // Cleanup
+        std::fs::remove_dir_all(&temp_dir).ok();
+    }
+
+    #[test]
+    fn test_parse_qdrant_url() {
+        // Test various URL formats
+        assert_eq!(
+            parse_qdrant_url("http://localhost:6333"),
+            ("localhost".to_string(), 6333)
+        );
+        assert_eq!(
+            parse_qdrant_url("localhost:6333"),
+            ("localhost".to_string(), 6333)
+        );
+        assert_eq!(
+            parse_qdrant_url("localhost"),
+            ("localhost".to_string(), 6333)
+        );
+        assert_eq!(
+            parse_qdrant_url("127.0.0.1:6334"),
+            ("127.0.0.1".to_string(), 6334)
+        );
+        assert_eq!(
+            parse_qdrant_url("https://qdrant.example.com:6333"),
+            ("qdrant.example.com".to_string(), 6333)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_embedded_storage_default_config() {
+        let temp_dir = std::env::temp_dir().join("reasonkit_embedded_default_test");
+        if temp_dir.exists() {
+            std::fs::remove_dir_all(&temp_dir).ok();
+        }
+
+        // Default config should use file storage (require_qdrant=false)
+        let mut config = EmbeddedStorageConfig::default();
+        config.data_path = temp_dir.clone();
+        let storage = create_embedded_storage(config).await.unwrap();
+
+        let context = AccessContext::new(
+            "test_user".to_string(),
+            AccessLevel::Admin,
+            "test".to_string(),
+        );
+
+        // Verify storage works
+        let stats = storage.stats(&context).await.unwrap();
+        assert_eq!(stats.document_count, 0);
+
+        // Cleanup
+        std::fs::remove_dir_all(&temp_dir).ok();
+    }
+
+    #[tokio::test]
+    async fn test_embedded_storage_with_qdrant_required_but_unavailable() {
+        let temp_dir = std::env::temp_dir().join("reasonkit_embedded_qdrant_test");
+        if temp_dir.exists() {
+            std::fs::remove_dir_all(&temp_dir).ok();
+        }
+
+        // Config requiring Qdrant but pointing to non-existent server
+        let config = EmbeddedStorageConfig::with_qdrant(
+            "http://localhost:99999", // Non-existent port
+            "test_collection",
+            768,
+        );
+        let mut config = config;
+        config.data_path = temp_dir.clone();
+
+        // Should fail because require_qdrant=true and Qdrant is not available
+        match create_embedded_storage(config).await {
+            Ok(_) => panic!("Expected error when Qdrant is required but unavailable"),
+            Err(e) => {
+                let error_msg = e.to_string();
+                assert!(
+                    error_msg.contains("Qdrant required but not available"),
+                    "Error message should mention Qdrant not available, got: {}",
+                    error_msg
+                );
+            }
+        }
 
         // Cleanup
         std::fs::remove_dir_all(&temp_dir).ok();
