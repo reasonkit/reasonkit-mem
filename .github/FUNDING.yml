@@ -1,0 +1,14 @@
+# ReasonKit Funding Configuration
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
+#
+# This file enables the "Sponsor" button on the repository
+# and links to our sponsorship platforms.
+
+# GitHub Sponsors - Primary platform for individual developers
+github: [reasonkit]
+
+# Open Collective - Transparent finances, good for corporate sponsors
+open_collective: reasonkit
+
+# Custom sponsorship page - Enterprise deals and custom arrangements
+custom: ["https://reasonkit.sh/sponsor"]

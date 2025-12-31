@@ -1,9 +1,9 @@
 [package]
 name = "reasonkit-mem"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.74"
-authors = ["ReasonKit Team <hello@reasonkit.sh>"]
+authors = ["ReasonKit Team <team@reasonkit.sh>"]
 description = "Memory & Retrieval Infrastructure for ReasonKit - Vector storage, hybrid search, RAPTOR trees"
 license = "Apache-2.0"
 repository = "https://github.com/reasonkit/reasonkit-mem"
@@ -12,6 +12,22 @@ documentation = "https://docs.rs/reasonkit-mem"
 readme = "README.md"
 keywords = ["rag", "vector-database", "retrieval", "embeddings", "raptor"]
 categories = ["science", "text-processing", "database"]
+
+include = [
+    "src/**/*",
+    "benches/**/*",
+    "examples/**/*",
+    "docs/**/*",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "SECURITY.md",
+]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [lib]
 name = "reasonkit_mem"

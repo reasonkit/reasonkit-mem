@@ -474,8 +474,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_reranker_with_threshold() {
-        let mut config = RerankerConfig::default();
-        config.score_threshold = Some(0.5);
+        let config = RerankerConfig {
+            score_threshold: Some(0.5),
+            ..Default::default()
+        };
         let reranker = Reranker::new(config);
         let candidates = create_test_candidates();
 

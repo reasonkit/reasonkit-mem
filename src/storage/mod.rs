@@ -1875,8 +1875,10 @@ mod tests {
         }
 
         // Default config should use file storage (require_qdrant=false)
-        let mut config = EmbeddedStorageConfig::default();
-        config.data_path = temp_dir.clone();
+        let config = EmbeddedStorageConfig {
+            data_path: temp_dir.clone(),
+            ..Default::default()
+        };
         let storage = create_embedded_storage(config).await.unwrap();
 
         let context = AccessContext::new(

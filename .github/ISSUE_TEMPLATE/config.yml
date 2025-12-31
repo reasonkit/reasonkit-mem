@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://docs.rs/reasonkit-mem
+    about: Read the official ReasonKit Mem documentation on docs.rs
+  - name: GitHub Discussions
+    url: https://github.com/reasonkit/reasonkit-mem/discussions
+    about: Ask questions and participate in community discussions
+  - name: Security Vulnerabilities
+    url: https://reasonkit.sh/security
+    about: For security issues, please email security@reasonkit.sh instead of opening a public issue

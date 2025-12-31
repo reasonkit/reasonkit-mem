@@ -37,6 +37,9 @@
 *PROPRIETARY*
 *ORCHESTRATOR*
 
+# Allow GitHub FUNDING.yml (sponsorship config)
+!.github/FUNDING.yml
+
 # ============================================================
 # ENVIRONMENT & SECRETS
 # ============================================================

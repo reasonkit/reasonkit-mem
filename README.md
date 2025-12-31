@@ -1,6 +1,24 @@
+<div align="center">
+
+<!-- Hero Banner - Memory Infrastructure -->
+<img src="https://raw.githubusercontent.com/ReasonKit/reasonkit-core/main/brand/banners/hero-tree.png" alt="ReasonKit Mem" width="100%" style="border-radius: 12px;">
+
 # ReasonKit Mem
 
-> Memory & Retrieval Infrastructure for ReasonKit
+**Memory & Retrieval Infrastructure for ReasonKit**
+
+[![Crates.io](https://img.shields.io/crates/v/reasonkit-mem?style=flat-square&color=%2306b6d4)](https://crates.io/crates/reasonkit-mem)
+[![docs.rs](https://img.shields.io/docsrs/reasonkit-mem?style=flat-square&color=%2310b981)](https://docs.rs/reasonkit-mem)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square&color=%23a855f7)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-1.74+-orange?style=flat-square&logo=rust&color=%23f97316)](https://www.rust-lang.org/)
+
+_The Long-Term Memory Layer ("Hippocampus") for AI Reasoning_
+
+[Documentation](https://docs.rs/reasonkit-mem) | [ReasonKit Core](https://github.com/ReasonKit/reasonkit-core) | [Website](https://reasonkit.sh)
+
+</div>
+
+---
 
 **ReasonKit Mem** is the memory layer ("Hippocampus") for ReasonKit. It provides vector storage, hybrid search, RAPTOR trees, and embedding support.
 
@@ -81,16 +99,31 @@ For detailed information about embedded mode, see [docs/EMBEDDED_MODE_GUIDE.md](
 
 ## Architecture
 
+<div align="center">
+
 ```
-Query → [Dense Encoder] → Qdrant ANN Search → Top-K Dense
-      → [BM25 Tokenizer] → Tantivy Search → Top-K Sparse
-                               ↓
-                    [Reciprocal Rank Fusion]
-                               ↓
-                    [Cross-Encoder Rerank]
-                               ↓
-                         Final Results
++---------------------------------------------------------------------+
+|                      HYBRID RETRIEVAL                               |
++---------------------------------------------------------------------+
+|                                                                     |
+|   Query --+---> [Dense Encoder] ---> Qdrant ANN ---> Top-K Dense   |
+|           |                                                         |
+|           +---> [BM25 Tokenizer] ---> Tantivy ---> Top-K Sparse    |
+|                                                                     |
+|                       v                                             |
+|            +----------------------+                                 |
+|            | Reciprocal Rank Fusion|                                |
+|            +----------+-----------+                                 |
+|                       v                                             |
+|            +----------------------+                                 |
+|            | Cross-Encoder Rerank |                                 |
+|            +----------+-----------+                                 |
+|                       v                                             |
+|                 Final Results                                       |
++---------------------------------------------------------------------+
 ```
+
+</div>
 
 ## Technology Stack
 
@@ -113,15 +146,32 @@ reasonkit-mem/
 │   ├── raptor/       # RAPTOR hierarchical tree structure
 │   ├── indexing/     # BM25/Tantivy sparse indexing
 │   └── rag/          # RAG pipeline orchestration
+├── benches/          # Performance benchmarks
+├── examples/         # Usage examples
+├── docs/             # Additional documentation
 └── Cargo.toml
 ```
+
+## Feature Flags
+
+| Feature            | Description                              |
+| ------------------ | ---------------------------------------- |
+| `default`          | Core functionality                       |
+| `python`           | Python bindings via PyO3                 |
+| `local-embeddings` | Local BGE-M3 embeddings via ONNX Runtime |
 
 ## License
 
 Apache License 2.0 - see [LICENSE](LICENSE)
 
-## Links
+---
 
-- [ReasonKit Core](https://github.com/reasonkit/reasonkit-core) - The reasoning engine
-- [ReasonKit Web](https://github.com/reasonkit/reasonkit-web) - Web sensing layer
-- [Website](https://reasonkit.sh) - Official website
+<div align="center">
+
+**Part of the ReasonKit Ecosystem**
+
+[ReasonKit Core](https://github.com/ReasonKit/reasonkit-core) | [ReasonKit Web](https://github.com/ReasonKit/reasonkit-web) | [Website](https://reasonkit.sh)
+
+_"See How Your AI Thinks"_
+
+</div>
