@@ -104,19 +104,19 @@ pub enum HotBackendType {
     #[default]
     InMemory,
     /// Memory-mapped file
-    Mmap { 
+    Mmap {
         /// Path to the memory-mapped file
-        path: PathBuf 
+        path: PathBuf,
     },
     /// Embedded RocksDB
-    RocksDb { 
+    RocksDb {
         /// Path to the RocksDB directory
-        path: PathBuf 
+        path: PathBuf,
     },
     /// Redis/Valkey connection
-    Redis { 
+    Redis {
         /// Redis connection URL
-        url: String 
+        url: String,
     },
 }
 
@@ -162,21 +162,21 @@ impl Default for ColdMemoryConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ColdBackendType {
     /// File-based storage (JSON + binary embeddings)
-    File { 
+    File {
         /// Base path for file storage
-        base_path: PathBuf 
+        base_path: PathBuf,
     },
     /// Qdrant vector database (local)
-    QdrantLocal { 
+    QdrantLocal {
         /// Qdrant server URL
-        url: String 
+        url: String,
     },
     /// Qdrant vector database (cloud)
-    QdrantCloud { 
+    QdrantCloud {
         /// Qdrant server URL
-        url: String, 
+        url: String,
         /// API key for authentication
-        api_key: String 
+        api_key: String,
     },
     /// S3-compatible object storage
     S3 {
@@ -210,9 +210,9 @@ pub enum QuantizationType {
     /// Binary quantization
     Binary,
     /// Product quantization with specified segments
-    ProductQuantization { 
+    ProductQuantization {
         /// Number of segments for product quantization
-        segments: usize 
+        segments: usize,
     },
 }
 

@@ -493,7 +493,7 @@ impl DualLayerMemory {
                 importance: 0.5, // default
                 access_count: 0, // cold entries don't track access
                 created_at: chrono::DateTime::from_timestamp(cold_entry.created_at, 0)
-.unwrap_or_else(chrono::Utc::now),
+                    .unwrap_or_else(chrono::Utc::now),
                 last_accessed: chrono::Utc::now(),
                 ttl_secs: None,
                 layer: MemoryLayer::Cold,
