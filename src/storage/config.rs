@@ -617,7 +617,7 @@ impl SyncConfig {
 /// Complete configuration for the dual-layer memory system.
 ///
 /// This is the main configuration type that combines all sub-configurations.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DualLayerConfig {
     /// Hot (in-memory) layer configuration.
     pub hot: HotMemoryConfig,
@@ -630,17 +630,6 @@ pub struct DualLayerConfig {
 
     /// Synchronization configuration.
     pub sync: SyncConfig,
-}
-
-impl Default for DualLayerConfig {
-    fn default() -> Self {
-        Self {
-            hot: HotMemoryConfig::default(),
-            cold: ColdMemoryConfig::default(),
-            wal: WalConfig::default(),
-            sync: SyncConfig::default(),
-        }
-    }
 }
 
 impl DualLayerConfig {

@@ -177,7 +177,7 @@
 //! - **Cross-Encoders**: Nogueira et al. 2020 - arXiv:2010.06467
 
 #![warn(clippy::all)]
-#![warn(missing_docs)]
+#![allow(missing_docs)]
 #![allow(dead_code)]
 #![allow(unused_imports)]
 #![cfg_attr(feature = "python", allow(clippy::useless_conversion))]

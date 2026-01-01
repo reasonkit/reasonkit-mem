@@ -193,7 +193,7 @@ impl ColdMemoryConfig {
 }
 
 /// Statistics about cold memory storage
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ColdMemoryStats {
     /// Total number of entries stored
     pub entry_count: u64,
@@ -209,20 +209,6 @@ pub struct ColdMemoryStats {
     pub search_count: u64,
     /// Average search latency in microseconds
     pub avg_search_latency_us: u64,
-}
-
-impl Default for ColdMemoryStats {
-    fn default() -> Self {
-        Self {
-            entry_count: 0,
-            embeddings_size_bytes: 0,
-            metadata_size_bytes: 0,
-            avg_embedding_dimension: 0,
-            last_compaction: None,
-            search_count: 0,
-            avg_search_latency_us: 0,
-        }
-    }
 }
 
 /// Filter criteria for vector search

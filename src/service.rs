@@ -48,7 +48,6 @@ use uuid::Uuid;
 /// These are duplicated here to avoid circular crate dependencies.
 /// When the `core-integration` feature is enabled, these should be imported
 /// from reasonkit-core instead.
-
 /// Result type for memory operations.
 pub type MemoryResult<T> = Result<T, MemoryError>;
 

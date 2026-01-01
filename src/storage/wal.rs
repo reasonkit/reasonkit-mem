@@ -234,10 +234,12 @@ impl From<u64> for LogSequenceNumber {
 pub struct CheckpointId(pub u64);
 
 impl CheckpointId {
+    /// Create a new checkpoint ID
     pub const fn new(value: u64) -> Self {
         Self(value)
     }
 
+    /// Get the underlying value
     pub const fn value(&self) -> u64 {
         self.0
     }
@@ -471,7 +473,7 @@ impl Checkpoint {
             return Err(MemError::storage("Buffer too small for checkpoint"));
         }
 
-        if &buf[0..4] != &CHECKPOINT_MAGIC {
+        if buf[0..4] != CHECKPOINT_MAGIC {
             return Err(MemError::storage("Invalid checkpoint magic"));
         }
 
@@ -1274,21 +1276,21 @@ impl WriteAheadLog {
                 Ok(file) => {
                     let mut reader = BufReader::new(file);
                     while let Ok(Some(entry)) = read_entry(&mut reader) {
-                        if entry.lsn > replay_from {
-                            if !matches!(entry.operation, WalOperation::Checkpoint { .. }) {
-                                if entry.verify() {
-                                    report.entries_recovered += 1;
-                                    report.entries_replayed += 1;
-                                    report.last_valid_lsn = entry.lsn();
-                                } else {
-                                    report.entries_skipped += 1;
-                                    report.errors.push(RecoveryError {
-                                        lsn: Some(entry.lsn()),
-                                        segment: Some(seg_meta.path.clone()),
-                                        message: "Invalid checksum".to_string(),
-                                        fatal: false,
-                                    });
-                                }
+                        if entry.lsn > replay_from
+                            && !matches!(entry.operation, WalOperation::Checkpoint { .. })
+                        {
+                            if entry.verify() {
+                                report.entries_recovered += 1;
+                                report.entries_replayed += 1;
+                                report.last_valid_lsn = entry.lsn();
+                            } else {
+                                report.entries_skipped += 1;
+                                report.errors.push(RecoveryError {
+                                    lsn: Some(entry.lsn()),
+                                    segment: Some(seg_meta.path.clone()),
+                                    message: "Invalid checksum".to_string(),
+                                    fatal: false,
+                                });
                             }
                         }
                     }
@@ -1311,15 +1313,15 @@ impl WriteAheadLog {
                 if let Ok(file) = File::open(&segment.meta.path) {
                     let mut reader = BufReader::new(file);
                     while let Ok(Some(entry)) = read_entry(&mut reader) {
-                        if entry.lsn > replay_from {
-                            if !matches!(entry.operation, WalOperation::Checkpoint { .. }) {
-                                if entry.verify() {
-                                    report.entries_recovered += 1;
-                                    report.entries_replayed += 1;
-                                    report.last_valid_lsn = entry.lsn();
-                                } else {
-                                    report.entries_skipped += 1;
-                                }
+                        if entry.lsn > replay_from
+                            && !matches!(entry.operation, WalOperation::Checkpoint { .. })
+                        {
+                            if entry.verify() {
+                                report.entries_recovered += 1;
+                                report.entries_replayed += 1;
+                                report.last_valid_lsn = entry.lsn();
+                            } else {
+                                report.entries_skipped += 1;
                             }
                         }
                     }
@@ -1554,6 +1556,7 @@ impl Default for InMemoryWal {
 }
 
 impl InMemoryWal {
+    /// Create a new in-memory WAL instance
     pub fn new() -> Self {
         Self {
             entries: RwLock::new(Vec::new()),

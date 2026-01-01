@@ -130,7 +130,7 @@ pub struct MemoryEntry {
 }
 
 /// Which layer a memory resides in
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum MemoryLayer {
     /// Hot layer - recent, frequently accessed
@@ -138,13 +138,8 @@ pub enum MemoryLayer {
     /// Cold layer - historical, archived
     Cold,
     /// Pending - being written, not yet committed
+    #[default]
     Pending,
-}
-
-impl Default for MemoryLayer {
-    fn default() -> Self {
-        Self::Pending
-    }
 }
 
 impl MemoryEntry {
@@ -466,12 +461,12 @@ impl DualLayerMemory {
                     hot_entry.created_at.elapsed().as_secs() as i64,
                     0,
                 )
-                .unwrap_or_else(|| chrono::Utc::now()),
+                .unwrap_or_else(chrono::Utc::now),
                 last_accessed: chrono::DateTime::from_timestamp(
                     hot_entry.accessed_at.elapsed().as_secs() as i64,
                     0,
                 )
-                .unwrap_or_else(|| chrono::Utc::now()),
+                .unwrap_or_else(chrono::Utc::now),
                 ttl_secs: None,
                 layer: MemoryLayer::Hot,
                 tags: Vec::new(),
@@ -498,7 +493,7 @@ impl DualLayerMemory {
                 importance: 0.5, // default
                 access_count: 0, // cold entries don't track access
                 created_at: chrono::DateTime::from_timestamp(cold_entry.created_at, 0)
-                    .unwrap_or_else(|| chrono::Utc::now()),
+.unwrap_or_else(chrono::Utc::now),
                 last_accessed: chrono::Utc::now(),
                 ttl_secs: None,
                 layer: MemoryLayer::Cold,
@@ -546,7 +541,7 @@ impl DualLayerMemory {
     pub async fn retrieve_context(&self, query: &str, limit: usize) -> Result<Vec<ContextResult>> {
         // TODO: Need embedding for ContextQuery - for now, create with empty embedding
         // This is a placeholder - actual implementation should compute embedding
-        let context_query = ContextQuery {
+        let _context_query = ContextQuery {
             text: query.to_string(),
             embedding: Vec::new(), // TODO: Compute embedding from query text
             limit,
@@ -591,7 +586,7 @@ impl DualLayerMemory {
                 // Migrate to cold
                 // Convert MemoryEntry to ColdMemoryEntry
                 let cold_entry = ColdMemoryEntry {
-                    id: entry.id.clone(),
+                    id: entry.id,
                     content: entry.content.clone(),
                     embedding: entry.embedding.clone().unwrap_or_default(),
                     metadata: serde_json::json!(entry.metadata),
@@ -652,7 +647,7 @@ impl DualLayerMemory {
         // For now, skip WAL recovery (would need to implement read_uncommitted or use recover)
         let operations: Vec<(u64, WalOperation)> = Vec::new(); // TODO: Implement WAL recovery
 
-        for (seq, operation) in operations {
+        for (_seq, operation) in operations {
             match operation {
                 WalOperation::Insert {
                     id,
@@ -802,7 +797,7 @@ impl DualLayerMemory {
     async fn background_sync_iteration(
         hot: &Arc<HotMemory>,
         cold: &Arc<ColdMemory>,
-        wal: &Arc<WriteAheadLog>,
+        _wal: &Arc<WriteAheadLog>,
         config: &DualLayerConfig,
     ) -> Result<()> {
         let threshold = Duration::from_secs(config.sync.hot_to_cold_age_secs);
@@ -835,7 +830,7 @@ impl DualLayerMemory {
                 // Migrate to cold
                 // Convert MemoryEntry to ColdMemoryEntry
                 let cold_entry = ColdMemoryEntry {
-                    id: entry.id.clone(),
+                    id: entry.id,
                     content: entry.content.clone(),
                     embedding: entry.embedding.clone().unwrap_or_default(),
                     metadata: serde_json::json!(entry.metadata),
@@ -2265,7 +2260,9 @@ impl StorageBackend for QdrantStorage {
         })
     }
 }
+/// Main storage interface for ReasonKit memory layer
 pub struct Storage {
+    /// Backend implementation for storage operations
     backend: Box<dyn StorageBackend>,
 }
 

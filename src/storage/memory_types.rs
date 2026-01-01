@@ -228,21 +228,16 @@ impl MemoryMetadata {
 /// - `Hot`: In-memory, fast access, limited capacity
 /// - `Cold`: Persistent storage, unlimited capacity, slower access
 /// - `Both`: Entry exists in both layers (during sync operations)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum MemoryLayer {
     /// Hot memory (in-memory, fast)
+    #[default]
     Hot,
     /// Cold memory (persistent, slow)
     Cold,
     /// Both layers (during synchronization)
     Both,
-}
-
-impl Default for MemoryLayer {
-    fn default() -> Self {
-        Self::Hot
-    }
 }
 
 impl std::fmt::Display for MemoryLayer {

@@ -82,9 +82,10 @@ impl Default for HotMemoryConfig {
 }
 
 /// Eviction policies for hot memory
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum EvictionPolicy {
     /// Least Recently Used
+    #[default]
     Lru,
     /// Least Frequently Used
     Lfu,
@@ -96,29 +97,27 @@ pub enum EvictionPolicy {
     Adaptive,
 }
 
-impl Default for EvictionPolicy {
-    fn default() -> Self {
-        Self::Lru
-    }
-}
-
 /// Backend types for hot storage
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum HotBackendType {
     /// Pure in-memory (HashMap-based)
+    #[default]
     InMemory,
     /// Memory-mapped file
-    Mmap { path: PathBuf },
+    Mmap { 
+        /// Path to the memory-mapped file
+        path: PathBuf 
+    },
     /// Embedded RocksDB
-    RocksDb { path: PathBuf },
+    RocksDb { 
+        /// Path to the RocksDB directory
+        path: PathBuf 
+    },
     /// Redis/Valkey connection
-    Redis { url: String },
-}
-
-impl Default for HotBackendType {
-    fn default() -> Self {
-        Self::InMemory
-    }
+    Redis { 
+        /// Redis connection URL
+        url: String 
+    },
 }
 
 /// Configuration for cold memory layer
@@ -163,16 +162,31 @@ impl Default for ColdMemoryConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ColdBackendType {
     /// File-based storage (JSON + binary embeddings)
-    File { base_path: PathBuf },
+    File { 
+        /// Base path for file storage
+        base_path: PathBuf 
+    },
     /// Qdrant vector database (local)
-    QdrantLocal { url: String },
+    QdrantLocal { 
+        /// Qdrant server URL
+        url: String 
+    },
     /// Qdrant vector database (cloud)
-    QdrantCloud { url: String, api_key: String },
+    QdrantCloud { 
+        /// Qdrant server URL
+        url: String, 
+        /// API key for authentication
+        api_key: String 
+    },
     /// S3-compatible object storage
-    ObjectStorage {
+    S3 {
+        /// S3 endpoint URL
         endpoint: String,
+        /// Bucket name
         bucket: String,
+        /// Access key ID
         access_key: String,
+        /// Secret access key
         secret_key: String,
     },
 }
@@ -186,18 +200,20 @@ impl Default for ColdBackendType {
 }
 
 /// Vector quantization types
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum QuantizationType {
+    /// No quantization (full precision)
     None,
+    /// 8-bit integer quantization
+    #[default]
     Int8,
+    /// Binary quantization
     Binary,
-    ProductQuantization { segments: usize },
-}
-
-impl Default for QuantizationType {
-    fn default() -> Self {
-        Self::Int8
-    }
+    /// Product quantization with specified segments
+    ProductQuantization { 
+        /// Number of segments for product quantization
+        segments: usize 
+    },
 }
 
 /// Write-Ahead Log configuration
@@ -237,22 +253,17 @@ impl Default for WalConfig {
 }
 
 /// WAL synchronization modes
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum WalSyncMode {
     /// Sync every write (slowest, safest)
     Immediate,
     /// Sync at intervals
+    #[default]
     Interval,
     /// Let OS handle syncing (fastest, least safe)
     OsManaged,
     /// No sync - WAL in memory only
     None,
-}
-
-impl Default for WalSyncMode {
-    fn default() -> Self {
-        Self::Interval
-    }
 }
 
 /// Synchronization and tiering configuration
@@ -322,16 +333,13 @@ impl Default for TieringPolicy {
 }
 
 /// Storage tier identifier
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum StorageTier {
+    /// Hot storage tier (fast access, limited capacity)
+    #[default]
     Hot,
+    /// Cold storage tier (slower access, large capacity)
     Cold,
-}
-
-impl Default for StorageTier {
-    fn default() -> Self {
-        Self::Hot
-    }
 }
 
 // ============================================================================
@@ -796,17 +804,11 @@ pub enum IsolationLevel {
     Serializable,
 }
 
-impl Default for IsolationLevel {
-    fn default() -> Self {
-        Self::ReadCommitted
-    }
-}
-
 /// Transaction operations
 #[derive(Debug, Clone)]
 pub enum TransactionOperation {
     StoreDocument {
-        doc: Document,
+        doc: Box<Document>,
         tier: StorageTier,
     },
     DeleteDocument {
