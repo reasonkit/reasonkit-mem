@@ -739,8 +739,9 @@ impl Default for HotMemory {
 
 // HotMemory is Send + Sync because DashMap is thread-safe
 // and all atomic counters use atomic operations
-unsafe impl Send for HotMemory {}
-unsafe impl Sync for HotMemory {}
+// HotMemory is automatically Send + Sync due to DashMap and Atomics
+// unsafe impl Send for HotMemory {}
+// unsafe impl Sync for HotMemory {}
 
 // ============================================================================
 // VECTOR OPERATIONS
