@@ -1,7 +1,7 @@
 # Cold Memory Design for ReasonKit-mem
 
 **Status**: Implemented
-**Location**: `/home/zyxsys/RK-PROJECT/reasonkit-mem/src/storage/cold.rs`
+**Location**: `src/storage/cold.rs`
 **Debian 13 Compatible**: Yes
 **External Dependencies**: Minimal (Sled - pure Rust)
 
@@ -455,10 +455,9 @@ cargo bench --bench storage_bench
 
 ## Related Documents
 
-- `/home/zyxsys/RK-PROJECT/reasonkit-mem/src/storage/mod.rs` - Storage module
-- `/home/zyxsys/RK-PROJECT/reasonkit-mem/src/error.rs` - Error types
-- `/home/zyxsys/RK-PROJECT/reasonkit-mem/docs/MEMORY_ARCHITECTURE_2025.md` - Overall architecture
-- `/home/zyxsys/RK-PROJECT/reasonkit-core/docs/adr/ADR-002-sqlite-for-audit-trail.md` - SQLite decision (audit trail)
+- `../src/storage/mod.rs` - Storage module
+- `../src/error.rs` - Error types
+- `MEMORY_ARCHITECTURE_2025.md` - Overall architecture
 
 ---
 

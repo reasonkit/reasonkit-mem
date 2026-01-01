@@ -1942,12 +1942,12 @@ let fast_wal = WalConfig {
 
 ## File Locations
 
-| Artifact        | Path                                                                            |
-| --------------- | ------------------------------------------------------------------------------- |
-| Design Document | `/home/zyxsys/RK-PROJECT/reasonkit-mem/docs/DUAL_LAYER_STORAGE_API_DESIGN.md`   |
-| Implementation  | `/home/zyxsys/RK-PROJECT/reasonkit-mem/src/storage/dual_layer.rs` (to create)   |
-| Tests           | `/home/zyxsys/RK-PROJECT/reasonkit-mem/tests/dual_layer_tests.rs` (to create)   |
-| Benchmarks      | `/home/zyxsys/RK-PROJECT/reasonkit-mem/benches/dual_layer_bench.rs` (to create) |
+| Artifact        | Path                                        |
+| --------------- | ------------------------------------------- |
+| Design Document | `docs/DUAL_LAYER_STORAGE_API_DESIGN.md`     |
+| Implementation  | `src/storage/dual_layer.rs`                 |
+| Tests           | `tests/dual_layer_tests.rs`                 |
+| Benchmarks      | `benches/dual_layer_bench.rs`               |
 
 ---
 
