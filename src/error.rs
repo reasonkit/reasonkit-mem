@@ -65,6 +65,37 @@ pub enum MemError {
     /// Invalid input
     #[error("Invalid input: {0}")]
     InvalidInput(String),
+
+    // ============================================================
+    // Dual-Layer Memory System Errors
+    // ============================================================
+    /// Hot memory errors (in-memory cache layer)
+    #[error("Hot memory error: {0}")]
+    HotMemory(String),
+
+    /// Cold memory errors (persistent storage layer)
+    #[error("Cold memory error: {0}")]
+    ColdMemory(String),
+
+    /// Write-Ahead Log (WAL) errors
+    #[error("WAL error: {0}")]
+    Wal(String),
+
+    /// Synchronization errors between hot and cold layers
+    #[error("Sync error: {0}")]
+    Sync(String),
+
+    /// Checksum verification failed
+    #[error("Checksum mismatch: expected {expected}, got {actual}")]
+    ChecksumMismatch { expected: u32, actual: u32 },
+
+    /// Recovery error during WAL replay or crash recovery
+    #[error("Recovery error: {0}")]
+    Recovery(String),
+
+    /// Capacity exceeded for memory limits
+    #[error("Capacity exceeded: {current} / {max}")]
+    CapacityExceeded { current: usize, max: usize },
 }
 
 impl From<serde_json::Error> for MemError {
@@ -165,6 +196,45 @@ impl MemError {
     pub fn generation(msg: impl Into<String>) -> Self {
         MemError::Retrieval(msg.into())
     }
+
+    // ============================================================
+    // Dual-Layer Memory System Helper Methods
+    // ============================================================
+
+    /// Create a hot memory error (in-memory cache layer)
+    pub fn hot_memory(msg: impl Into<String>) -> Self {
+        MemError::HotMemory(msg.into())
+    }
+
+    /// Create a cold memory error (persistent storage layer)
+    pub fn cold_memory(msg: impl Into<String>) -> Self {
+        MemError::ColdMemory(msg.into())
+    }
+
+    /// Create a WAL (Write-Ahead Log) error
+    pub fn wal(msg: impl Into<String>) -> Self {
+        MemError::Wal(msg.into())
+    }
+
+    /// Create a sync error between hot and cold layers
+    pub fn sync(msg: impl Into<String>) -> Self {
+        MemError::Sync(msg.into())
+    }
+
+    /// Create a checksum mismatch error
+    pub fn checksum_mismatch(expected: u32, actual: u32) -> Self {
+        MemError::ChecksumMismatch { expected, actual }
+    }
+
+    /// Create a recovery error
+    pub fn recovery(msg: impl Into<String>) -> Self {
+        MemError::Recovery(msg.into())
+    }
+
+    /// Create a capacity exceeded error
+    pub fn capacity_exceeded(current: usize, max: usize) -> Self {
+        MemError::CapacityExceeded { current, max }
+    }
 }
 
 #[cfg(test)]
@@ -182,5 +252,53 @@ mod tests {
         let io_err = io::Error::new(io::ErrorKind::NotFound, "file not found");
         let mem_err: MemError = io_err.into();
         assert!(matches!(mem_err, MemError::Io(_)));
+    }
+
+    #[test]
+    fn test_hot_memory_error() {
+        let err = MemError::hot_memory("cache eviction failed");
+        assert_eq!(err.to_string(), "Hot memory error: cache eviction failed");
+    }
+
+    #[test]
+    fn test_cold_memory_error() {
+        let err = MemError::cold_memory("disk write failed");
+        assert_eq!(err.to_string(), "Cold memory error: disk write failed");
+    }
+
+    #[test]
+    fn test_wal_error() {
+        let err = MemError::wal("log corruption detected");
+        assert_eq!(err.to_string(), "WAL error: log corruption detected");
+    }
+
+    #[test]
+    fn test_sync_error() {
+        let err = MemError::sync("hot-cold sync timeout");
+        assert_eq!(err.to_string(), "Sync error: hot-cold sync timeout");
+    }
+
+    #[test]
+    fn test_checksum_mismatch() {
+        let err = MemError::checksum_mismatch(0xDEADBEEF, 0xCAFEBABE);
+        assert_eq!(
+            err.to_string(),
+            "Checksum mismatch: expected 3735928559, got 3405691582"
+        );
+    }
+
+    #[test]
+    fn test_recovery_error() {
+        let err = MemError::recovery("WAL replay failed at entry 42");
+        assert_eq!(
+            err.to_string(),
+            "Recovery error: WAL replay failed at entry 42"
+        );
+    }
+
+    #[test]
+    fn test_capacity_exceeded() {
+        let err = MemError::capacity_exceeded(1500, 1000);
+        assert_eq!(err.to_string(), "Capacity exceeded: 1500 / 1000");
     }
 }

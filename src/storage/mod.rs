@@ -1,6 +1,43 @@
-//! Storage module for ReasonKit Core
+//! Storage module for ReasonKit Memory
 //!
-//! Provides document and chunk storage using Qdrant vector database.
+//! Provides document and chunk storage using Qdrant vector database,
+//! with a dual-layer architecture for hot/cold memory management.
+//!
+//! ## Architecture
+//!
+//! ```text
+//! +-------------------+
+//! |  DualLayerMemory  |  Unified interface for all memory operations
+//! +-------------------+
+//!          |
+//!    +-----+-----+
+//!    |           |
+//! +------+   +------+
+//! | Hot  |   | Cold |   Hot = recent/active, Cold = historical
+//! +------+   +------+
+//!    |           |
+//!    +-----+-----+
+//!          |
+//!    +----------+
+//!    |   WAL    |   Write-ahead log for durability
+//!    +----------+
+//! ```
+//!
+//! ## Usage
+//!
+//! ```rust,ignore
+//! use reasonkit_mem::storage::{DualLayerMemory, DualLayerConfig};
+//!
+//! // Create dual-layer memory
+//! let config = DualLayerConfig::default();
+//! let memory = DualLayerMemory::new(config).await?;
+//!
+//! // Store a memory entry
+//! let id = memory.store(entry).await?;
+//!
+//! // Retrieve context for a query
+//! let results = memory.retrieve_context("search query", 10).await?;
+//! ```
 
 use crate::{embedding::cosine_similarity, Document, Error, Result};
 use async_trait::async_trait;
@@ -16,6 +53,783 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use uuid::Uuid;
+
+// ============================================================================
+// NEW: Dual-Layer Memory Modules
+// ============================================================================
+
+/// Hot memory layer for recent/active memories (fast access)
+pub mod hot;
+
+/// Cold memory layer for historical/archived memories (optimized storage)
+pub mod cold;
+
+/// Write-ahead log for durability and recovery
+pub mod wal;
+
+/// Context retrieval utilities
+pub mod context;
+
+/// Dual-layer storage facade with unified interface
+pub mod dual_layer;
+
+/// Background sync worker for hot-to-cold migration
+pub mod sync_worker;
+
+/// Configuration types for dual-layer storage
+pub mod config;
+
+/// Memory entry types and traits
+pub mod memory_types;
+
+/// Serialization utilities
+pub mod serde_utils;
+
+// Re-export new module types
+pub use cold::{ColdMemory, ColdMemoryConfig, ColdMemoryEntry};
+pub use context::{retrieve_context, ContextQuery, ContextResult};
+pub use hot::{HotMemory, HotMemoryConfig, HotMemoryEntry};
+pub use wal::{WalConfig, WalOperation, WriteAheadLog};
+
+// Re-export dual-layer storage types
+pub use dual_layer::{
+    ContextResult as DualContextResult, DualLayerConfig, DualLayerError, DualLayerResult,
+    DualLayerStorage, StorageTier,
+};
+
+// ============================================================================
+// Memory Entry Types
+// ============================================================================
+
+/// A unified memory entry that can be stored in either hot or cold layer
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryEntry {
+    /// Unique identifier
+    pub id: Uuid,
+    /// Text content
+    pub content: String,
+    /// Embedding vector (optional, computed if not provided)
+    pub embedding: Option<Vec<f32>>,
+    /// Metadata key-value pairs
+    pub metadata: HashMap<String, String>,
+    /// Importance score (0.0 - 1.0)
+    pub importance: f32,
+    /// Access count for LRU tracking
+    pub access_count: u64,
+    /// Creation timestamp
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    /// Last access timestamp
+    pub last_accessed: chrono::DateTime<chrono::Utc>,
+    /// Optional TTL in seconds (None = never expires)
+    pub ttl_secs: Option<u64>,
+    /// Memory layer location
+    pub layer: MemoryLayer,
+    /// Tags for categorization
+    pub tags: Vec<String>,
+}
+
+/// Which layer a memory resides in
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MemoryLayer {
+    /// Hot layer - recent, frequently accessed
+    Hot,
+    /// Cold layer - historical, archived
+    Cold,
+    /// Pending - being written, not yet committed
+    Pending,
+}
+
+impl Default for MemoryLayer {
+    fn default() -> Self {
+        Self::Pending
+    }
+}
+
+impl MemoryEntry {
+    /// Create a new memory entry with the given content
+    pub fn new(content: impl Into<String>) -> Self {
+        let now = chrono::Utc::now();
+        Self {
+            id: Uuid::new_v4(),
+            content: content.into(),
+            embedding: None,
+            metadata: HashMap::new(),
+            importance: 0.5,
+            access_count: 0,
+            created_at: now,
+            last_accessed: now,
+            ttl_secs: None,
+            layer: MemoryLayer::Pending,
+            tags: Vec::new(),
+        }
+    }
+
+    /// Set the embedding vector
+    pub fn with_embedding(mut self, embedding: Vec<f32>) -> Self {
+        self.embedding = Some(embedding);
+        self
+    }
+
+    /// Set importance score
+    pub fn with_importance(mut self, importance: f32) -> Self {
+        self.importance = importance.clamp(0.0, 1.0);
+        self
+    }
+
+    /// Add a metadata key-value pair
+    pub fn with_metadata(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.metadata.insert(key.into(), value.into());
+        self
+    }
+
+    /// Set TTL in seconds
+    pub fn with_ttl(mut self, ttl_secs: u64) -> Self {
+        self.ttl_secs = Some(ttl_secs);
+        self
+    }
+
+    /// Add tags
+    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
+        self.tags = tags;
+        self
+    }
+
+    /// Check if this entry has expired
+    pub fn is_expired(&self) -> bool {
+        if let Some(ttl) = self.ttl_secs {
+            let elapsed = chrono::Utc::now()
+                .signed_duration_since(self.created_at)
+                .num_seconds() as u64;
+            elapsed > ttl
+        } else {
+            false
+        }
+    }
+
+    /// Calculate age in seconds
+    pub fn age_secs(&self) -> i64 {
+        chrono::Utc::now()
+            .signed_duration_since(self.created_at)
+            .num_seconds()
+    }
+
+    /// Calculate time since last access in seconds
+    pub fn idle_secs(&self) -> i64 {
+        chrono::Utc::now()
+            .signed_duration_since(self.last_accessed)
+            .num_seconds()
+    }
+}
+
+// ============================================================================
+// Dual-Layer Configuration
+// ============================================================================
+
+/// Configuration for the dual-layer memory system
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DualLayerConfig {
+    /// Hot memory layer configuration
+    pub hot: HotMemoryConfig,
+    /// Cold memory layer configuration
+    pub cold: ColdMemoryConfig,
+    /// Write-ahead log configuration
+    pub wal: WalConfig,
+    /// Interval for background sync operations
+    pub sync_interval: Duration,
+    /// Threshold for moving entries from hot to cold (age in seconds)
+    pub hot_to_cold_threshold: Duration,
+    /// Minimum importance score to keep in hot layer regardless of age
+    pub min_hot_importance: f32,
+    /// Maximum entries in hot layer before forced migration
+    pub max_hot_entries: usize,
+    /// Enable automatic background sync
+    pub auto_sync: bool,
+}
+
+impl Default for DualLayerConfig {
+    fn default() -> Self {
+        Self {
+            hot: HotMemoryConfig::default(),
+            cold: ColdMemoryConfig::default(),
+            wal: WalConfig::default(),
+            sync_interval: Duration::from_secs(60),
+            hot_to_cold_threshold: Duration::from_secs(3600), // 1 hour
+            min_hot_importance: 0.8,
+            max_hot_entries: 10000,
+            auto_sync: true,
+        }
+    }
+}
+
+impl DualLayerConfig {
+    /// Create a configuration optimized for low-latency reads
+    pub fn low_latency() -> Self {
+        Self {
+            hot: HotMemoryConfig {
+                max_entries: 50000,
+                ..Default::default()
+            },
+            sync_interval: Duration::from_secs(30),
+            hot_to_cold_threshold: Duration::from_secs(7200), // 2 hours
+            max_hot_entries: 50000,
+            ..Default::default()
+        }
+    }
+
+    /// Create a configuration optimized for memory efficiency
+    pub fn memory_efficient() -> Self {
+        Self {
+            hot: HotMemoryConfig {
+                max_entries: 1000,
+                ..Default::default()
+            },
+            sync_interval: Duration::from_secs(120),
+            hot_to_cold_threshold: Duration::from_secs(300), // 5 minutes
+            max_hot_entries: 1000,
+            ..Default::default()
+        }
+    }
+}
+
+// ============================================================================
+// Sync Statistics
+// ============================================================================
+
+/// Statistics from a sync operation
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SyncStats {
+    /// Number of entries moved from hot to cold
+    pub hot_to_cold: usize,
+    /// Number of expired entries removed
+    pub expired_removed: usize,
+    /// Number of WAL entries replayed
+    pub wal_replayed: usize,
+    /// Number of WAL entries compacted
+    pub wal_compacted: usize,
+    /// Duration of the sync operation
+    pub duration_ms: u64,
+    /// Any errors encountered (non-fatal)
+    pub warnings: Vec<String>,
+}
+
+/// Report from a recovery operation
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct RecoveryReport {
+    /// Number of entries recovered from WAL
+    pub entries_recovered: usize,
+    /// Number of entries lost (unrecoverable)
+    pub entries_lost: usize,
+    /// Number of operations replayed
+    pub operations_replayed: usize,
+    /// Last committed sequence number
+    pub last_sequence: u64,
+    /// Duration of recovery
+    pub duration_ms: u64,
+    /// Errors encountered during recovery
+    pub errors: Vec<String>,
+    /// Whether recovery was successful
+    pub success: bool,
+}
+
+// ============================================================================
+// Dual-Layer Memory Implementation
+// ============================================================================
+
+/// Unified dual-layer memory storage combining hot and cold layers with WAL
+///
+/// This is the primary interface for all memory operations in ReasonKit.
+/// It automatically handles:
+/// - Routing writes through WAL for durability
+/// - Placing new entries in hot layer
+/// - Migrating old/less-accessed entries to cold layer
+/// - Background synchronization
+/// - Recovery from crashes
+pub struct DualLayerMemory {
+    /// Hot memory layer (in-memory, fast)
+    hot: Arc<HotMemory>,
+    /// Cold memory layer (disk-backed, large capacity)
+    cold: Arc<ColdMemory>,
+    /// Write-ahead log for durability
+    wal: Arc<WriteAheadLog>,
+    /// Configuration
+    config: DualLayerConfig,
+    /// Background sync task handle
+    sync_handle: Option<tokio::task::JoinHandle<()>>,
+    /// Shutdown signal sender
+    shutdown_tx: Option<tokio::sync::oneshot::Sender<()>>,
+    /// Track if shutdown has been initiated
+    is_shutdown: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl DualLayerMemory {
+    /// Create a new dual-layer memory system
+    ///
+    /// # Arguments
+    /// * `config` - Configuration for all layers
+    ///
+    /// # Returns
+    /// * `Result<Self>` - The initialized memory system
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let config = DualLayerConfig::default();
+    /// let memory = DualLayerMemory::new(config).await?;
+    /// ```
+    pub async fn new(config: DualLayerConfig) -> Result<Self> {
+        // Initialize hot memory layer
+        let hot = Arc::new(HotMemory::new(config.hot.clone())?);
+
+        // Initialize cold memory layer
+        let cold = Arc::new(ColdMemory::new(config.cold.clone()).await?);
+
+        // Initialize write-ahead log
+        let wal = Arc::new(WriteAheadLog::new(config.wal.clone()).await?);
+
+        let is_shutdown = Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+        let mut memory = Self {
+            hot,
+            cold,
+            wal,
+            config: config.clone(),
+            sync_handle: None,
+            shutdown_tx: None,
+            is_shutdown,
+        };
+
+        // Recover from WAL if needed
+        let recovery = memory.recover().await?;
+        if recovery.entries_recovered > 0 {
+            tracing::info!(
+                "Recovered {} entries from WAL in {}ms",
+                recovery.entries_recovered,
+                recovery.duration_ms
+            );
+        }
+
+        // Start background sync if enabled
+        if config.auto_sync {
+            memory.start_background_sync();
+        }
+
+        Ok(memory)
+    }
+
+    /// Store a memory entry
+    ///
+    /// The entry is first written to WAL for durability, then stored in the hot layer.
+    ///
+    /// # Arguments
+    /// * `entry` - The memory entry to store
+    ///
+    /// # Returns
+    /// * `Result<Uuid>` - The ID of the stored entry
+    pub async fn store(&self, mut entry: MemoryEntry) -> Result<Uuid> {
+        // Assign ID if not set
+        if entry.id == Uuid::nil() {
+            entry.id = Uuid::new_v4();
+        }
+
+        // Write to WAL first
+        let operation = WalOperation::Store {
+            entry: entry.clone(),
+        };
+        self.wal.append(operation).await?;
+
+        // Update layer to hot
+        entry.layer = MemoryLayer::Hot;
+
+        // Store in hot layer
+        self.hot.store(entry.clone().into()).await?;
+
+        tracing::debug!(id = %entry.id, "Stored entry in hot layer");
+
+        Ok(entry.id)
+    }
+
+    /// Get a memory entry by ID
+    ///
+    /// Checks hot layer first, then cold layer.
+    ///
+    /// # Arguments
+    /// * `id` - The UUID of the entry to retrieve
+    ///
+    /// # Returns
+    /// * `Result<Option<MemoryEntry>>` - The entry if found
+    pub async fn get(&self, id: &Uuid) -> Result<Option<MemoryEntry>> {
+        // Check hot layer first
+        if let Some(hot_entry) = self.hot.get(id).await? {
+            return Ok(Some(hot_entry.into()));
+        }
+
+        // Check cold layer
+        if let Some(cold_entry) = self.cold.get(id).await? {
+            // Optionally promote to hot layer on access
+            // (could be configurable)
+            return Ok(Some(cold_entry.into()));
+        }
+
+        Ok(None)
+    }
+
+    /// Delete a memory entry
+    ///
+    /// Removes from both hot and cold layers.
+    ///
+    /// # Arguments
+    /// * `id` - The UUID of the entry to delete
+    ///
+    /// # Returns
+    /// * `Result<bool>` - True if the entry was found and deleted
+    pub async fn delete(&self, id: &Uuid) -> Result<bool> {
+        // Write delete operation to WAL
+        let operation = WalOperation::Delete { id: *id };
+        self.wal.append(operation).await?;
+
+        // Delete from hot layer
+        let hot_deleted = self.hot.delete(id).await?;
+
+        // Delete from cold layer
+        let cold_deleted = self.cold.delete(id).await?;
+
+        Ok(hot_deleted || cold_deleted)
+    }
+
+    /// Retrieve context for a query
+    ///
+    /// Searches both hot and cold layers and returns relevant entries.
+    ///
+    /// # Arguments
+    /// * `query` - The search query string
+    /// * `limit` - Maximum number of results to return
+    ///
+    /// # Returns
+    /// * `Result<Vec<ContextResult>>` - Matching entries with scores
+    pub async fn retrieve_context(&self, query: &str, limit: usize) -> Result<Vec<ContextResult>> {
+        let query = ContextQuery {
+            text: query.to_string(),
+            limit,
+            min_score: 0.0,
+            include_hot: true,
+            include_cold: true,
+            tags: None,
+            metadata_filters: None,
+        };
+
+        context::retrieve_context(&self.hot, &self.cold, &query).await
+    }
+
+    /// Perform a sync operation
+    ///
+    /// Moves old entries from hot to cold, removes expired entries, and compacts WAL.
+    ///
+    /// # Returns
+    /// * `Result<SyncStats>` - Statistics about the sync operation
+    pub async fn sync(&self) -> Result<SyncStats> {
+        let start = Instant::now();
+        let mut stats = SyncStats::default();
+
+        // Get entries to migrate from hot to cold
+        let threshold = self.config.hot_to_cold_threshold;
+        let min_importance = self.config.min_hot_importance;
+
+        let hot_entries = self.hot.list_entries().await?;
+
+        for entry in hot_entries {
+            // Skip high-importance entries
+            if entry.importance >= min_importance {
+                continue;
+            }
+
+            // Check if entry is old enough to migrate
+            let idle_duration = Duration::from_secs(entry.idle_secs() as u64);
+            if idle_duration >= threshold {
+                // Migrate to cold
+                let cold_entry: ColdMemoryEntry = entry.clone().into();
+                self.cold.store(cold_entry).await?;
+
+                // Remove from hot
+                self.hot.delete(&entry.id).await?;
+
+                stats.hot_to_cold += 1;
+            }
+
+            // Check for expired entries
+            if entry.is_expired() {
+                self.hot.delete(&entry.id).await?;
+                stats.expired_removed += 1;
+            }
+        }
+
+        // Remove expired entries from cold layer
+        let expired_cold = self.cold.cleanup_expired().await?;
+        stats.expired_removed += expired_cold;
+
+        // Compact WAL
+        let wal_stats = self.wal.compact().await?;
+        stats.wal_compacted = wal_stats.entries_removed;
+
+        stats.duration_ms = start.elapsed().as_millis() as u64;
+
+        tracing::info!(
+            hot_to_cold = stats.hot_to_cold,
+            expired = stats.expired_removed,
+            wal_compacted = stats.wal_compacted,
+            duration_ms = stats.duration_ms,
+            "Sync completed"
+        );
+
+        Ok(stats)
+    }
+
+    /// Recover from WAL after a crash
+    ///
+    /// Replays all uncommitted operations from the WAL.
+    ///
+    /// # Returns
+    /// * `Result<RecoveryReport>` - Report of the recovery operation
+    pub async fn recover(&self) -> Result<RecoveryReport> {
+        let start = Instant::now();
+        let mut report = RecoveryReport::default();
+
+        // Read operations from WAL
+        let operations = self.wal.read_uncommitted().await?;
+
+        for (seq, operation) in operations {
+            match operation {
+                WalOperation::Store { entry } => {
+                    // Restore to hot layer
+                    match self.hot.store(entry.into()).await {
+                        Ok(_) => {
+                            report.entries_recovered += 1;
+                        }
+                        Err(e) => {
+                            report
+                                .errors
+                                .push(format!("Failed to recover entry: {}", e));
+                            report.entries_lost += 1;
+                        }
+                    }
+                }
+                WalOperation::Delete { id } => {
+                    // Apply delete
+                    let _ = self.hot.delete(&id).await;
+                    let _ = self.cold.delete(&id).await;
+                }
+                WalOperation::Update { entry } => {
+                    // Apply update
+                    match self.hot.store(entry.into()).await {
+                        Ok(_) => {
+                            report.entries_recovered += 1;
+                        }
+                        Err(e) => {
+                            report
+                                .errors
+                                .push(format!("Failed to recover update: {}", e));
+                        }
+                    }
+                }
+                WalOperation::Checkpoint { sequence } => {
+                    report.last_sequence = sequence;
+                }
+            }
+            report.operations_replayed += 1;
+        }
+
+        report.duration_ms = start.elapsed().as_millis() as u64;
+        report.success = report.errors.is_empty();
+
+        Ok(report)
+    }
+
+    /// Gracefully shutdown the memory system
+    ///
+    /// Stops background sync, flushes WAL, and cleans up resources.
+    ///
+    /// # Returns
+    /// * `Result<()>` - Success if shutdown was clean
+    pub async fn shutdown(&self) -> Result<()> {
+        self.is_shutdown
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+
+        // Signal shutdown to background task
+        if let Some(tx) = self.shutdown_tx.as_ref() {
+            // The sender might already be consumed, so we ignore the result
+            let _ = tx.send(());
+        }
+
+        // Wait for background task to finish
+        // Note: sync_handle is behind Option and we can't take from &self
+        // The task will exit on next iteration when it sees is_shutdown
+
+        // Perform final sync
+        let _ = self.sync().await;
+
+        // Flush WAL
+        self.wal.flush().await?;
+
+        tracing::info!("DualLayerMemory shutdown complete");
+
+        Ok(())
+    }
+
+    /// Start the background sync worker
+    fn start_background_sync(&mut self) {
+        let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel();
+        self.shutdown_tx = Some(shutdown_tx);
+
+        let hot = self.hot.clone();
+        let cold = self.cold.clone();
+        let wal = self.wal.clone();
+        let config = self.config.clone();
+        let is_shutdown = self.is_shutdown.clone();
+
+        let handle = tokio::spawn(async move {
+            let mut interval = tokio::time::interval(config.sync_interval);
+
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        if is_shutdown.load(std::sync::atomic::Ordering::SeqCst) {
+                            break;
+                        }
+
+                        // Perform sync operations
+                        if let Err(e) = Self::background_sync_iteration(
+                            &hot,
+                            &cold,
+                            &wal,
+                            &config,
+                        ).await {
+                            tracing::warn!(error = %e, "Background sync iteration failed");
+                        }
+                    }
+                    _ = &mut shutdown_rx => {
+                        tracing::debug!("Background sync received shutdown signal");
+                        break;
+                    }
+                }
+            }
+
+            tracing::debug!("Background sync worker exited");
+        });
+
+        self.sync_handle = Some(handle);
+    }
+
+    /// Single iteration of background sync
+    async fn background_sync_iteration(
+        hot: &Arc<HotMemory>,
+        cold: &Arc<ColdMemory>,
+        wal: &Arc<WriteAheadLog>,
+        config: &DualLayerConfig,
+    ) -> Result<()> {
+        let threshold = config.hot_to_cold_threshold;
+        let min_importance = config.min_hot_importance;
+
+        // Get entries to potentially migrate
+        let hot_entries = hot.list_entries().await?;
+        let mut migrated = 0;
+        let mut expired = 0;
+
+        for entry in hot_entries {
+            // Remove expired entries
+            if entry.is_expired() {
+                hot.delete(&entry.id).await?;
+                expired += 1;
+                continue;
+            }
+
+            // Skip high-importance entries
+            if entry.importance >= min_importance {
+                continue;
+            }
+
+            // Check if old enough to migrate
+            let idle_duration = Duration::from_secs(entry.idle_secs() as u64);
+            if idle_duration >= threshold {
+                // Migrate to cold
+                let cold_entry: ColdMemoryEntry = entry.clone().into();
+                cold.store(cold_entry).await?;
+                hot.delete(&entry.id).await?;
+                migrated += 1;
+            }
+        }
+
+        // Cleanup expired from cold
+        let cold_expired = cold.cleanup_expired().await?;
+
+        // Compact WAL periodically
+        let _ = wal.compact().await;
+
+        if migrated > 0 || expired > 0 || cold_expired > 0 {
+            tracing::debug!(
+                migrated = migrated,
+                hot_expired = expired,
+                cold_expired = cold_expired,
+                "Background sync completed"
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Get statistics about memory usage
+    pub async fn stats(&self) -> Result<DualLayerStats> {
+        let hot_stats = self.hot.stats().await?;
+        let cold_stats = self.cold.stats().await?;
+        let wal_stats = self.wal.stats().await?;
+
+        Ok(DualLayerStats {
+            hot_entry_count: hot_stats.entry_count,
+            hot_memory_bytes: hot_stats.memory_bytes,
+            cold_entry_count: cold_stats.entry_count,
+            cold_disk_bytes: cold_stats.disk_bytes,
+            wal_entry_count: wal_stats.entry_count,
+            wal_disk_bytes: wal_stats.disk_bytes,
+            total_entries: hot_stats.entry_count + cold_stats.entry_count,
+        })
+    }
+
+    /// Get the hot memory layer (for advanced usage)
+    pub fn hot(&self) -> &Arc<HotMemory> {
+        &self.hot
+    }
+
+    /// Get the cold memory layer (for advanced usage)
+    pub fn cold(&self) -> &Arc<ColdMemory> {
+        &self.cold
+    }
+
+    /// Get the WAL (for advanced usage)
+    pub fn wal(&self) -> &Arc<WriteAheadLog> {
+        &self.wal
+    }
+}
+
+/// Statistics for the dual-layer memory system
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DualLayerStats {
+    /// Number of entries in hot layer
+    pub hot_entry_count: usize,
+    /// Memory used by hot layer in bytes
+    pub hot_memory_bytes: usize,
+    /// Number of entries in cold layer
+    pub cold_entry_count: usize,
+    /// Disk space used by cold layer in bytes
+    pub cold_disk_bytes: u64,
+    /// Number of entries in WAL
+    pub wal_entry_count: usize,
+    /// Disk space used by WAL in bytes
+    pub wal_disk_bytes: u64,
+    /// Total entries across all layers
+    pub total_entries: usize,
+}
+
+// ============================================================================
+// Original Storage Module Code (Preserved)
+// ============================================================================
 
 /// Security configuration for Qdrant connections
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1764,6 +2578,50 @@ mod tests {
     fn test_default_storage_path() {
         let path = default_storage_path();
         assert!(path.ends_with("reasonkit/storage") || path.ends_with("reasonkit\\storage"));
+    }
+
+    #[test]
+    fn test_memory_entry_creation() {
+        let entry = MemoryEntry::new("Test content");
+        assert!(!entry.content.is_empty());
+        assert_eq!(entry.importance, 0.5);
+        assert_eq!(entry.layer, MemoryLayer::Pending);
+    }
+
+    #[test]
+    fn test_memory_entry_builder() {
+        let entry = MemoryEntry::new("Test content")
+            .with_importance(0.9)
+            .with_metadata("key", "value")
+            .with_ttl(3600)
+            .with_tags(vec!["tag1".to_string(), "tag2".to_string()]);
+
+        assert_eq!(entry.importance, 0.9);
+        assert_eq!(entry.metadata.get("key"), Some(&"value".to_string()));
+        assert_eq!(entry.ttl_secs, Some(3600));
+        assert_eq!(entry.tags.len(), 2);
+    }
+
+    #[test]
+    fn test_dual_layer_config_default() {
+        let config = DualLayerConfig::default();
+        assert_eq!(config.sync_interval, Duration::from_secs(60));
+        assert!(config.auto_sync);
+        assert_eq!(config.max_hot_entries, 10000);
+    }
+
+    #[test]
+    fn test_dual_layer_config_low_latency() {
+        let config = DualLayerConfig::low_latency();
+        assert_eq!(config.max_hot_entries, 50000);
+        assert_eq!(config.sync_interval, Duration::from_secs(30));
+    }
+
+    #[test]
+    fn test_dual_layer_config_memory_efficient() {
+        let config = DualLayerConfig::memory_efficient();
+        assert_eq!(config.max_hot_entries, 1000);
+        assert_eq!(config.hot_to_cold_threshold, Duration::from_secs(300));
     }
 
     #[tokio::test]

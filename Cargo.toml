@@ -1,38 +1,56 @@
 [package]
 name = "reasonkit-mem"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.74"
 authors = ["ReasonKit Team <team@reasonkit.sh>"]
-description = "Memory & Retrieval Infrastructure for ReasonKit - Vector storage, hybrid search, RAPTOR trees"
+description = "Memory & Retrieval Infrastructure for ReasonKit - Vector storage, hybrid search, RAPTOR trees, and reranking"
 license = "Apache-2.0"
 repository = "https://github.com/reasonkit/reasonkit-mem"
 homepage = "https://reasonkit.sh"
 documentation = "https://docs.rs/reasonkit-mem"
 readme = "README.md"
 keywords = ["rag", "vector-database", "retrieval", "embeddings", "raptor"]
-categories = ["science", "text-processing", "database"]
+categories = ["science", "text-processing", "database", "caching"]
 
+# Explicit include list for crates.io package
 include = [
-    "src/**/*",
-    "benches/**/*",
-    "examples/**/*",
-    "docs/**/*",
-    "Cargo.toml",
-    "README.md",
-    "LICENSE",
-    "CHANGELOG.md",
-    "SECURITY.md",
+    "/src/**/*",
+    "/benches/**/*",
+    "/examples/**/*",
+    "/Cargo.toml",
+    "/README.md",
+    "/LICENSE",
+    "/CHANGELOG.md",
+    "/SECURITY.md",
+]
+
+# Exclude patterns for safety
+exclude = [
+    "/docs/**/*",
+    "/target/**/*",
+    "*.png",
+    "*.svg",
+    "*.jpg",
+    "*.gif",
 ]
 
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[badges]
+maintenance = { status = "actively-developed" }
 
 [lib]
 name = "reasonkit_mem"
 path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
+
+# ============================================================================
+# BENCHMARKS
+# ============================================================================
 
 [[bench]]
 name = "raptor_bench"
@@ -50,19 +68,37 @@ harness = false
 name = "rerank_bench"
 harness = false
 
+[[bench]]
+name = "storage_bench"
+harness = false
+
+# ============================================================================
+# DEPENDENCIES
+# ============================================================================
+
 [dependencies]
-# Python Bindings
+# Python Bindings (optional)
 pyo3 = { version = "0.22", features = ["extension-module"], optional = true }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+serde_bytes = "0.11"
+
+# Binary serialization (faster than JSON for embeddings)
+bincode = "1.3"
+
+# MessagePack serialization (compact binary format)
+rmp-serde = "1.3"
 
 # Vector Database (Qdrant)
 qdrant-client = "1.10"
 
 # Full-text Search (Tantivy BM25)
 tantivy = "0.22"
+
+# Embedded key-value store (pure Rust)
+sled = "0.34"
 
 # Async Runtime
 tokio = { version = "1", features = ["full"] }
@@ -89,8 +125,23 @@ chrono = { version = "0.4", features = ["serde"] }
 # Cryptographic hashing for caching
 sha2 = "0.10"
 
+# Hex encoding for hash output
+hex = "0.4"
+
+# CRC32 checksum
+crc32fast = "1.4"
+
 # Rayon for parallel processing
 rayon = "1.10"
+
+# Concurrent data structures
+dashmap = "5.5"
+
+# CPU detection for optimal shard count
+num_cpus = "1.16"
+
+# Atomic types
+crossbeam-utils = "0.8"
 
 # Directories (for default paths)
 dirs = "5"
@@ -104,13 +155,35 @@ tokenizers = { version = "0.19", optional = true }
 # NDArray for tensor operations
 ndarray = { version = "0.16", optional = true }
 
+# LZ4 compression (optional, for dual-layer memory)
+lz4_flex = { version = "0.11", optional = true }
+
+# ============================================================================
+# DEV DEPENDENCIES
+# ============================================================================
+
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3.10"
 pretty_assertions = "1.4"
 criterion = { version = "0.5", features = ["async_tokio"] }
 
+# ============================================================================
+# FEATURES
+# ============================================================================
+
 [features]
+# Default: minimal feature set for library use
 default = []
+
+# Python bindings via PyO3
 python = ["pyo3"]
+
+# Local BGE-M3 ONNX embeddings (no API calls needed)
 local-embeddings = ["ort", "tokenizers", "ndarray"]
+
+# LZ4 compression for dual-layer memory architecture
+compression = ["lz4_flex"]
+
+# Full feature set
+full = ["python", "local-embeddings", "compression"]
