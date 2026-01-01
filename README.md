@@ -1,8 +1,5 @@
 <div align="center">
 
-<!-- Hero Banner - Memory Infrastructure -->
-<img src="https://raw.githubusercontent.com/ReasonKit/reasonkit-core/main/brand/banners/hero-tree.png" alt="ReasonKit Mem" width="100%" style="border-radius: 12px;">
-
 # ReasonKit Mem
 
 **Memory & Retrieval Infrastructure for ReasonKit**
