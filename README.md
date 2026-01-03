@@ -150,23 +150,24 @@ For detailed information about embedded mode, see [docs/EMBEDDED_MODE_GUIDE.md](
 
 ## Architecture
 
-![ReasonKit Mem Hybrid Architecture](https://reasonkit.sh/assets/brand/mem/hybrid_architecture.png)
-![ReasonKit Mem Hybrid Architecture Technical Diagram](https://reasonkit.sh/assets/brand/mem/hybrid_retrieval_engine.svg)
+![ReasonKit Mem Hybrid Architecture](./brand/readme/hybrid_architecture.png)
+![ReasonKit Mem Hybrid Architecture Technical Diagram](./brand/readme/hybrid_retrieval_engine.svg)
 
 ### The RAPTOR Algorithm (Hierarchical Indexing)
 
 ReasonKit Mem implements **RAPTOR** (Recursive Abstractive Processing for Tree-Organized Retrieval) to answer high-level questions across large document sets.
 
-![ReasonKit Mem RAPTOR Tree Structure](https://reasonkit.sh/assets/brand/mem/raptor_tree_structure.svg)
-![ReasonKit Mem RAPTOR Tree](https://reasonkit.sh/assets/brand/mem/raptor_tree.png)
+![ReasonKit Mem RAPTOR Tree Structure](./brand/readme/raptor_tree_structure.svg)
+
+![ReasonKit Mem RAPTOR Tree](./brand/readme/raptor_tree.png)
 
 ### The Memory Dashboard
 
-![ReasonKit Mem Dashboard](https://reasonkit.sh/assets/brand/mem/memory_dashboard.png)
+![ReasonKit Mem Dashboard](./brand/readme/memory_dashboard.png)
 
 ### Integration Ecosystem
 
-![ReasonKit Mem Ecosystem](https://reasonkit.sh/assets/brand/mem/mem_ecosystem.png)
+![ReasonKit Mem Ecosystem](./brand/readme/mem_ecosystem.png)
 
 ## Technology Stack
 
@@ -308,7 +309,7 @@ Apache License 2.0 - see [LICENSE](https://github.com/reasonkit/reasonkit-mem/bl
 
 <div align="center">
 
-![ReasonKit Ecosystem Connection](https://reasonkit.sh/assets/brand/mem/ecosystem_connection.png)
+![ReasonKit Ecosystem Connection](./brand/readme/ecosystem_connection.png)
 
 **Part of the ReasonKit Ecosystem**
 
