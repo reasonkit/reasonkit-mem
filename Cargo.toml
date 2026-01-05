@@ -87,7 +87,7 @@ harness = false
 
 [dependencies]
 # Python Bindings (optional)
-pyo3 = { version = "0.24.1", features = ["extension-module"], optional = true }
+pyo3 = { version = "0.27.2", features = ["extension-module"], optional = true }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -95,7 +95,7 @@ serde_json = "1.0"
 serde_bytes = "0.11"
 
 # Binary serialization (faster than JSON for embeddings)
-bincode = "1.3"
+bincode = "3.0"
 
 # MessagePack serialization (compact binary format)
 rmp-serde = "1.3"
@@ -113,11 +113,11 @@ sled = "0.34"
 tokio = { version = "1", features = ["full"] }
 
 # HTTP Client (for Qdrant health checks)
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.13", features = ["json"] }
 
 # Error Handling
 anyhow = "1.0"
-thiserror = "1.0"
+thiserror = "2.0"
 
 # Async traits
 async-trait = "0.1"
@@ -144,7 +144,7 @@ crc32fast = "1.4"
 rayon = "1.10"
 
 # Concurrent data structures
-dashmap = "5.5"
+dashmap = "6.1"
 
 # CPU detection for optimal shard count
 num_cpus = "1.16"
@@ -153,19 +153,19 @@ num_cpus = "1.16"
 crossbeam-utils = "0.8"
 
 # Directories (for default paths)
-dirs = "5"
+dirs = "6"
 
 # ONNX Runtime for local embeddings (BGE-M3)
 ort = { version = "2.0.0-rc.10", optional = true }
 
 # HuggingFace tokenizers
-tokenizers = { version = "0.19", optional = true }
+tokenizers = { version = "0.22", optional = true }
 
 # NDArray for tensor operations
-ndarray = { version = "0.16", optional = true }
+ndarray = { version = "0.17", optional = true }
 
 # LZ4 compression (optional, for dual-layer memory)
-lz4_flex = { version = "0.11", optional = true }
+lz4_flex = { version = "0.12", optional = true }
 
 # ============================================================================
 # DEV DEPENDENCIES
@@ -175,7 +175,7 @@ lz4_flex = { version = "0.11", optional = true }
 tokio-test = "0.4"
 tempfile = "3.10"
 pretty_assertions = "1.4"
-criterion = { version = "0.5", features = ["async_tokio"] }
+criterion = { version = "0.8", features = ["async_tokio"] }
 proptest = "1.4"
 
 # ============================================================================
