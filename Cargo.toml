@@ -170,13 +170,13 @@ crossbeam-utils = "0.8"
 dirs = "5"
 
 # ONNX Runtime for local embeddings (BGE-M3)
-ort = { version = "2.0.0-rc.10", optional = true }
+ort = { version = "2.0.0-rc.11", optional = true }
 
 # HuggingFace tokenizers
-tokenizers = { version = "0.19", optional = true }
+tokenizers = { version = "0.21", optional = true }
 
-# NDArray for tensor operations
-ndarray = { version = "0.16", optional = true }
+# NDArray for tensor operations (must match ort's ndarray version)
+ndarray = { version = "0.17", optional = true }
 
 # LZ4 compression (optional, for dual-layer memory)
 lz4_flex = { version = "0.11", optional = true }
