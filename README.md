@@ -11,7 +11,7 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square&color=%23a855f7)](./LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.74+-orange?style=flat-square&logo=rust&color=%23f97316)](https://www.rust-lang.org/)
 
-*The Long-Term Memory Layer ("Hippocampus") for AI Reasoning*
+_The Long-Term Memory Layer ("Hippocampus") for AI Reasoning_
 
 [Documentation](https://docs.rs/reasonkit-mem) | [ReasonKit Core](https://github.com/ReasonKit/reasonkit-core) | [Website](https://reasonkit.sh)
 
@@ -30,6 +30,22 @@
 - **Reranking** - Cross-encoder reranking for precision
 
 ## Installation
+
+### Universal Installer (Recommended)
+
+**Installs all 4 ReasonKit projects together:**
+
+```bash
+curl -fsSL https://get.reasonkit.sh | bash -s -- --with-memory
+```
+
+**Platform & Shell Support:**
+- ✅ All platforms (Linux/macOS/Windows/WSL)
+- ✅ All shells (Bash/Zsh/Fish/Nu/PowerShell/Elvish)
+- ✅ Auto-detects shell and configures PATH
+- ✅ Beautiful progress visualization
+
+### Cargo (Rust Library)
 
 Add to your `Cargo.toml`:
 
@@ -150,23 +166,24 @@ For detailed information about embedded mode, see [docs/EMBEDDED_MODE_GUIDE.md](
 
 ## Architecture
 
-![ReasonKit Mem Hybrid Architecture](https://reasonkit.sh/assets/brand/mem/hybrid_architecture.png)
-![ReasonKit Mem Hybrid Architecture Technical Diagram](https://reasonkit.sh/assets/brand/mem/hybrid_retrieval_engine.svg)
+![ReasonKit Mem Hybrid Architecture](./brand/readme/hybrid_architecture.png)
+![ReasonKit Mem Hybrid Architecture Technical Diagram](./brand/readme/hybrid_retrieval_engine.svg)
 
 ### The RAPTOR Algorithm (Hierarchical Indexing)
 
 ReasonKit Mem implements **RAPTOR** (Recursive Abstractive Processing for Tree-Organized Retrieval) to answer high-level questions across large document sets.
 
-![ReasonKit Mem RAPTOR Tree Structure](https://reasonkit.sh/assets/brand/mem/raptor_tree_structure.svg)
-![ReasonKit Mem RAPTOR Tree](https://reasonkit.sh/assets/brand/mem/raptor_tree.png)
+![ReasonKit Mem RAPTOR Tree Structure](./brand/readme/raptor_tree_structure.svg)
+
+![ReasonKit Mem RAPTOR Tree](./brand/readme/raptor_tree.png)
 
 ### The Memory Dashboard
 
-![ReasonKit Mem Dashboard](https://reasonkit.sh/assets/brand/mem/memory_dashboard.png)
+![ReasonKit Mem Dashboard](./brand/readme/memory_dashboard.png)
 
 ### Integration Ecosystem
 
-![ReasonKit Mem Ecosystem](https://reasonkit.sh/assets/brand/mem/mem_ecosystem.png)
+![ReasonKit Mem Ecosystem](./brand/readme/mem_ecosystem.png)
 
 ## Technology Stack
 
@@ -275,14 +292,14 @@ use reasonkit_mem::retrieval::{
 
 ## Version & Maturity
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| **Vector Storage** | ✅ Stable | Qdrant integration production-ready |
-| **Hybrid Search** | ✅ Stable | Dense + Sparse fusion working |
-| **RAPTOR Trees** | ✅ Stable | Hierarchical retrieval implemented |
-| **Embeddings** | ✅ Stable | OpenAI API fully supported |
-| **Local Embeddings** | 🔶 Beta | BGE-M3 ONNX (enable with `local-embeddings` feature) |
-| **Python Bindings** | 🔶 Beta | Build from source with `--features python` |
+| Component            | Status    | Notes                                                |
+| -------------------- | --------- | ---------------------------------------------------- |
+| **Vector Storage**   | ✅ Stable | Qdrant integration production-ready                  |
+| **Hybrid Search**    | ✅ Stable | Dense + Sparse fusion working                        |
+| **RAPTOR Trees**     | ✅ Stable | Hierarchical retrieval implemented                   |
+| **Embeddings**       | ✅ Stable | OpenAI API fully supported                           |
+| **Local Embeddings** | 🔶 Beta   | BGE-M3 ONNX (enable with `local-embeddings` feature) |
+| **Python Bindings**  | 🔶 Beta   | Build from source with `--features python`           |
 
 **Current Version:** v0.1.2 | [CHANGELOG](CHANGELOG.md) | [Releases](https://github.com/reasonkit/reasonkit-mem/releases)
 
@@ -308,12 +325,12 @@ Apache License 2.0 - see [LICENSE](https://github.com/reasonkit/reasonkit-mem/bl
 
 <div align="center">
 
-![ReasonKit Ecosystem Connection](https://reasonkit.sh/assets/brand/mem/ecosystem_connection.png)
+![ReasonKit Ecosystem Connection](./brand/readme/ecosystem_connection.png)
 
 **Part of the ReasonKit Ecosystem**
 
 [ReasonKit Core](https://github.com/reasonkit/reasonkit-core) | [ReasonKit Web](https://github.com/reasonkit/reasonkit-web) | [Website](https://reasonkit.sh)
 
-*"See How Your AI Thinks"*
+_"See How Your AI Thinks"_
 
 </div>

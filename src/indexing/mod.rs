@@ -208,19 +208,19 @@ impl BM25Index {
 
             let doc_id = retrieved_doc
                 .get_first(self.fields.doc_id)
-                .and_then(|v: &tantivy::schema::OwnedValue| v.as_str())
+                .and_then(|v| v.as_str())
                 .map(|s: &str| s.to_string())
                 .unwrap_or_default();
 
             let chunk_id = retrieved_doc
                 .get_first(self.fields.chunk_id)
-                .and_then(|v: &tantivy::schema::OwnedValue| v.as_str())
+                .and_then(|v| v.as_str())
                 .map(|s: &str| s.to_string())
                 .unwrap_or_default();
 
             let text = retrieved_doc
                 .get_first(self.fields.text)
-                .and_then(|v: &tantivy::schema::OwnedValue| v.as_str())
+                .and_then(|v| v.as_str())
                 .map(|s: &str| s.to_string())
                 .unwrap_or_default();
 
@@ -313,19 +313,19 @@ impl BM25Index {
 
             let doc_id_str = retrieved_doc
                 .get_first(self.fields.doc_id)
-                .and_then(|v: &tantivy::schema::OwnedValue| v.as_str())
+                .and_then(|v| v.as_str())
                 .map(|s: &str| s.to_string())
                 .unwrap_or_default();
 
             let chunk_id_str = retrieved_doc
                 .get_first(self.fields.chunk_id)
-                .and_then(|v: &tantivy::schema::OwnedValue| v.as_str())
+                .and_then(|v| v.as_str())
                 .map(|s: &str| s.to_string())
                 .unwrap_or_default();
 
             let text = retrieved_doc
                 .get_first(self.fields.text)
-                .and_then(|v: &tantivy::schema::OwnedValue| v.as_str())
+                .and_then(|v| v.as_str())
                 .map(|s: &str| s.to_string())
                 .unwrap_or_default();
 

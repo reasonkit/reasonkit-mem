@@ -835,4 +835,4 @@ REASONKIT_CONNECTION_POOL_SIZE=10
 
 ---
 
-*Document maintained by ReasonKit Team. For questions, see [CONTRIBUTING.md](../CONTRIBUTING.md).*
+_Document maintained by ReasonKit Team. For questions, see [CONTRIBUTING.md](../CONTRIBUTING.md)._

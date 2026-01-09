@@ -1966,5 +1966,5 @@ fn cosine_distance(a: &[f32], b: &[f32]) -> f32 {
 
 ---
 
-*Document generated for ReasonKit-mem v0.2.0*
-*Architecture designed for Debian 13+ compatibility*
+_Document generated for ReasonKit-mem v0.2.0_
+_Architecture designed for Debian 13+ compatibility_
