@@ -47,7 +47,7 @@ targets = [
     "aarch64-apple-darwin",
     "x86_64-pc-windows-msvc",
 ]
-cargo-args = ["--locked"]
+# Note: --locked removed because workspace members don't have their own Cargo.lock
 
 [badges]
 maintenance = { status = "actively-developed" }
