@@ -1942,12 +1942,12 @@ let fast_wal = WalConfig {
 
 ## File Locations
 
-| Artifact        | Path                                        |
-| --------------- | ------------------------------------------- |
-| Design Document | `docs/DUAL_LAYER_STORAGE_API_DESIGN.md`     |
-| Implementation  | `src/storage/dual_layer.rs`                 |
-| Tests           | `tests/dual_layer_tests.rs`                 |
-| Benchmarks      | `benches/dual_layer_bench.rs`               |
+| Artifact        | Path                                    |
+| --------------- | --------------------------------------- |
+| Design Document | `docs/DUAL_LAYER_STORAGE_API_DESIGN.md` |
+| Implementation  | `src/storage/dual_layer.rs`             |
+| Tests           | `tests/dual_layer_tests.rs`             |
+| Benchmarks      | `benches/dual_layer_bench.rs`           |
 
 ---
 
@@ -1959,4 +1959,4 @@ let fast_wal = WalConfig {
 
 ---
 
-*This design follows ReasonKit's Rust-first philosophy and is compatible with the existing `StorageBackend` trait while providing enhanced capabilities for dual-layer memory management.*
+_This design follows ReasonKit's Rust-first philosophy and is compatible with the existing `StorageBackend` trait while providing enhanced capabilities for dual-layer memory management._

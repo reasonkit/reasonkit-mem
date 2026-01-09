@@ -82,6 +82,20 @@ name = "storage_bench"
 harness = false
 
 # ============================================================================
+# BINARIES
+# ============================================================================
+
+[[bin]]
+name = "vdream_mcp"
+path = "src/bin/vdream_mcp.rs"
+required-features = ["vdreamteam"]
+
+[[bin]]
+name = "vdream_cli"
+path = "src/bin/vdream_cli.rs"
+required-features = ["vdreamteam"]
+
+# ============================================================================
 # DEPENDENCIES
 # ============================================================================
 
@@ -167,6 +181,9 @@ ndarray = { version = "0.16", optional = true }
 # LZ4 compression (optional, for dual-layer memory)
 lz4_flex = { version = "0.11", optional = true }
 
+# YAML serialization (optional, for vDreamTeam memory system)
+serde_yaml = { version = "0.9", optional = true }
+
 # ============================================================================
 # DEV DEPENDENCIES
 # ============================================================================
@@ -195,5 +212,12 @@ local-embeddings = ["ort", "tokenizers", "ndarray"]
 # LZ4 compression for dual-layer memory architecture
 compression = ["lz4_flex"]
 
+# vDreamTeam AI Agent Memory System
+# Provides structured memory for AI agent teams with:
+# - Constitutional layer (shared identity, constraints)
+# - Role-specific memory (per-agent decisions, lessons, PxP logs)
+# - Cross-agent coordination logging
+vdreamteam = ["serde_yaml"]
+
 # Full feature set
-full = ["python", "local-embeddings", "compression"]
+full = ["python", "local-embeddings", "compression", "vdreamteam"]

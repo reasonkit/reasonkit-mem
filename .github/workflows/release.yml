@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'This workflow is deprecated. Use reasonkit/.github/workflows/release.yml instead.'
+        description: "This workflow is deprecated. Use reasonkit/.github/workflows/release.yml instead."
         required: true
         type: boolean
         default: false

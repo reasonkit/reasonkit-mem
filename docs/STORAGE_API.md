@@ -1529,5 +1529,5 @@ use reasonkit_mem::storage::{
 
 ---
 
-*This documentation is part of the ReasonKit Memory Infrastructure.*
-*Report issues at: <https://github.com/ReasonKit/reasonkit-mem/issues>*
+_This documentation is part of the ReasonKit Memory Infrastructure._
+_Report issues at: <https://github.com/ReasonKit/reasonkit-mem/issues>_

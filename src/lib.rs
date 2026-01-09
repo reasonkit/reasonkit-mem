@@ -524,6 +524,37 @@ pub mod rag;
 /// ```
 pub mod service;
 
+/// vDreamTeam AI Agent Memory System.
+///
+/// This module provides structured memory for AI agent teams, enabling:
+/// - Constitutional layer (shared identity, constraints, governance)
+/// - Role-specific memory (per-agent decisions, lessons, PxP logs)
+/// - Cross-agent coordination logging
+///
+/// Requires the `vdreamteam` feature flag.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use reasonkit_mem::vdreamteam::{VDreamMemory, PxPEntry, Consultation};
+///
+/// let mut memory = VDreamMemory::load(".agents").await?;
+///
+/// let entry = PxPEntry::new("vcto", "Architecture decision")
+///     .add_consultation(Consultation {
+///         model: "deepseek-v3.2".to_string(),
+///         cli_command: "ollama run deepseek-v3.2:cloud".to_string(),
+///         prompt_summary: "Validate design".to_string(),
+///         response_summary: "Design approved".to_string(),
+///         confidence: 0.90,
+///     });
+///
+/// memory.log_pxp(entry).await?;
+/// ```
+#[cfg(feature = "vdreamteam")]
+#[cfg_attr(docsrs, doc(cfg(feature = "vdreamteam")))]
+pub mod vdreamteam;
+
 /// Prelude for convenient imports.
 ///
 /// This module re-exports the most commonly used types for convenience.

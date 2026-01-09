@@ -51,4 +51,4 @@ Open an issue or reach out at [team@reasonkit.sh](mailto:team@reasonkit.sh).
 
 ---
 
-*Part of the ReasonKit Ecosystem*
+_Part of the ReasonKit Ecosystem_
