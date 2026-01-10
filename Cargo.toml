@@ -1,6 +1,6 @@
 [package]
 name = "reasonkit-mem"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 rust-version = "1.75"
 authors = ["ReasonKit Team <team@reasonkit.sh>"]
@@ -95,6 +95,11 @@ name = "vdream_cli"
 path = "src/bin/vdream_cli.rs"
 required-features = ["vdreamteam"]
 
+[[bin]]
+name = "rkmem_server"
+path = "src/bin/rkmem_server.rs"
+required-features = ["http-server"]
+
 # ============================================================================
 # DEPENDENCIES
 # ============================================================================
@@ -129,6 +134,10 @@ tokio = { version = "1", features = ["full"] }
 # HTTP Client (for Qdrant health checks)
 reqwest = { version = "0.12", features = ["json"] }
 
+# HTTP Server (for API sidecar mode)
+axum = { version = "0.7", optional = true }
+tower-http = { version = "0.5", features = ["cors", "trace"], optional = true }
+
 # Error Handling
 anyhow = "1.0"
 thiserror = "1.0"
@@ -138,6 +147,7 @@ async-trait = "0.1"
 
 # Logging
 tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt"], optional = true }
 
 # UUID
 uuid = { version = "1", features = ["v4", "serde"] }
@@ -219,5 +229,8 @@ compression = ["lz4_flex"]
 # - Cross-agent coordination logging
 vdreamteam = ["serde_yaml"]
 
+# HTTP API Server for external RAG integration
+http-server = ["axum", "tower-http", "tracing-subscriber"]
+
 # Full feature set
-full = ["python", "local-embeddings", "compression", "vdreamteam"]
+full = ["python", "local-embeddings", "compression", "vdreamteam", "http-server"]
