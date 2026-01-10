@@ -4,12 +4,13 @@
 
 **Memory & Retrieval Infrastructure for ReasonKit**
 
-[![CI](https://img.shields.io/github/actions/workflow/status/reasonkit/reasonkit-mem/ci.yml?branch=main&style=flat-square&logo=github&label=CI&color=06b6d4)](https://github.com/reasonkit/reasonkit-mem/actions/workflows/ci.yml)
-[![Security](https://img.shields.io/github/actions/workflow/status/reasonkit/reasonkit-mem/security.yml?branch=main&style=flat-square&logo=github&label=Security&color=10b981)](https://github.com/reasonkit/reasonkit-mem/actions/workflows/security.yml)
-[![Crates.io](https://img.shields.io/crates/v/reasonkit-mem?style=flat-square&color=%2306b6d4)](https://crates.io/crates/reasonkit-mem)
-[![docs.rs](https://img.shields.io/docsrs/reasonkit-mem?style=flat-square&color=%2310b981)](https://docs.rs/reasonkit-mem)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square&color=%23a855f7)](./LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.74+-orange?style=flat-square&logo=rust&color=%23f97316)](https://www.rust-lang.org/)
+[![CI](https://badges.reasonkit.sh/github/actions/workflow/status/reasonkit/reasonkit-mem/ci.yml?branch=main&style=flat-square&logo=github&label=CI&color=06b6d4&logoColor=06b6d4)](https://github.com/reasonkit/reasonkit-mem/actions/workflows/ci.yml)
+[![Security](https://badges.reasonkit.sh/github/actions/workflow/status/reasonkit/reasonkit-mem/security.yml?branch=main&style=flat-square&logo=github&label=Security&color=10b981&logoColor=10b981)](https://github.com/reasonkit/reasonkit-mem/actions/workflows/security.yml)
+[![Crates.io](https://badges.reasonkit.sh/crates/v/reasonkit-mem?style=flat-square&logo=rust&color=10b981&logoColor=f9fafb)](https://crates.io/crates/reasonkit-mem)
+[![docs.rs](https://badges.reasonkit.sh/docsrs/reasonkit-mem?style=flat-square&logo=docs.rs&color=06b6d4&logoColor=f9fafb)](https://docs.rs/reasonkit-mem)
+[![Downloads](https://badges.reasonkit.sh/crates/d/reasonkit-mem?style=flat-square&color=ec4899&logo=rust&logoColor=f9fafb)](https://crates.io/crates/reasonkit-mem)
+[![License](https://badges.reasonkit.sh/static/v1?label=license&message=Apache%202.0&color=a855f7&style=flat-square&labelColor=030508)](./LICENSE)
+[![Rust](https://badges.reasonkit.sh/static/v1?label=rust&message=1.75%2B&color=f97316&style=flat-square&logo=rust&logoColor=f9fafb)](https://www.rust-lang.org/)
 
 _The Long-Term Memory Layer ("Hippocampus") for AI Reasoning_
 
@@ -40,6 +41,7 @@ curl -fsSL https://get.reasonkit.sh | bash -s -- --with-memory
 ```
 
 **Platform & Shell Support:**
+
 - ✅ All platforms (Linux/macOS/Windows/WSL)
 - ✅ All shells (Bash/Zsh/Fish/Nu/PowerShell/Elvish)
 - ✅ Auto-detects shell and configures PATH
