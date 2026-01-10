@@ -165,8 +165,10 @@ jobs:
           prefix-key: "v1-docs"
           cache-on-failure: true
 
+      # Use --features compression to match docs.rs metadata configuration
+      # (avoids python/local-embeddings which require system deps not in docs.rs)
       - name: Build documentation
-        run: cargo doc --no-deps --all-features
+        run: cargo doc --no-deps --features compression
         env:
           RUSTDOCFLAGS: "-D warnings"
 
