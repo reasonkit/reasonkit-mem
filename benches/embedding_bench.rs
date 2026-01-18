@@ -2,7 +2,8 @@
 //!
 //! Performance target: < 5ms for mock embedding operations (cache lookups)
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use std::hint::black_box;
 use std::collections::HashMap;
 
 /// Mock embedding generator (simulates fast local embedding)
