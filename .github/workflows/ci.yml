@@ -22,6 +22,10 @@ env:
   CARGO_INCREMENTAL: 0
   # Override .cargo/config.toml target-cpu=native to prevent SIGILL on different runners
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: ""
+  # PyO3: Enable forward compatibility with newer Python versions on macOS
+  PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
+  # CI-safe features (excludes python, local-embeddings which require system deps)
+  CI_FEATURES: "compression,vdreamteam"
 
 jobs:
   # ===========================================================================
@@ -56,8 +60,8 @@ jobs:
       - name: Build
         run: cargo build --release
 
-      - name: Build (all features)
-        run: cargo build --release --all-features
+      - name: Build (CI features)
+        run: cargo build --release --features "$CI_FEATURES"
 
   # ===========================================================================
   # GATE 2: Lint with Clippy
@@ -85,7 +89,7 @@ jobs:
           cache-on-failure: true
 
       - name: Run Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --features "$CI_FEATURES" -- -D warnings
 
   # ===========================================================================
   # GATE 3: Format Check
@@ -136,7 +140,7 @@ jobs:
           cache-on-failure: true
 
       - name: Run tests
-        run: cargo test --all-features
+        run: cargo test --features "$CI_FEATURES"
 
       - name: Run doc tests
         run: cargo test --doc

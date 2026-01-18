@@ -2,8 +2,9 @@
 //!
 //! Performance target: < 5ms for tree traversal and search operations
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use reasonkit_mem::raptor::{RaptorNode, RaptorTree};
+use std::hint::black_box;
 use uuid::Uuid;
 
 /// Create mock RAPTOR tree for benchmarking

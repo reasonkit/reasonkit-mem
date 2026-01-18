@@ -2,9 +2,10 @@
 //!
 //! Performance target: < 5ms for fusion operations on typical result sets
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use reasonkit_mem::retrieval::fusion::{to_ranked_results, FusionEngine, RankedResult};
 use std::collections::HashMap;
+use std::hint::black_box;
 use uuid::Uuid;
 
 /// Generate ranked results for benchmarking

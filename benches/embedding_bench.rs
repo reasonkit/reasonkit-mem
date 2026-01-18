@@ -2,8 +2,9 @@
 //!
 //! Performance target: < 5ms for mock embedding operations (cache lookups)
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::collections::HashMap;
+use std::hint::black_box;
 
 /// Mock embedding generator (simulates fast local embedding)
 fn mock_embed(text: &str) -> Vec<f32> {
