@@ -550,7 +550,7 @@ async fn test_multiple_pxp_sessions() {
                 model: format!("model-{}", j),
                 cli_command: format!("ollama run model-{}", j),
                 prompt_summary: format!("Prompt {} for decision {}", j, i),
-                response_summary: format!("Response validated"),
+                response_summary: "Response validated".to_string(),
                 confidence: 0.80 + (j as f64 * 0.05),
             });
         }
