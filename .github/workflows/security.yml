@@ -37,21 +37,21 @@ jobs:
         run: |
           # Run audit and capture output
           cargo audit --json > audit.json 2>&1 || true
-          
+
           # Check for critical/high severity vulnerabilities only
           CRITICAL=$(jq '[.vulnerabilities.list[]? | select(.advisory.severity == "critical")] | length' audit.json 2>/dev/null || echo "0")
           HIGH=$(jq '[.vulnerabilities.list[]? | select(.advisory.severity == "high")] | length' audit.json 2>/dev/null || echo "0")
-          
+
           echo "Critical vulnerabilities: $CRITICAL"
           echo "High vulnerabilities: $HIGH"
-          
+
           # Fail only on critical/high (warnings handled by cargo-deny)
           if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
             echo "❌ Critical or high severity vulnerabilities found"
             cat audit.json | jq '.vulnerabilities.list[]? | select(.advisory.severity == "critical" or .advisory.severity == "high")'
             exit 1
           fi
-          
+
           echo "✅ No critical/high vulnerabilities found"
 
   cargo-deny:

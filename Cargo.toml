@@ -55,7 +55,8 @@ maintenance = { status = "actively-developed" }
 [lib]
 name = "reasonkit_mem"
 path = "src/lib.rs"
-crate-type = ["cdylib", "rlib"]
+# Only rlib for library use - cdylib is added by maturin when building Python wheels
+crate-type = ["rlib"]
 
 # ============================================================================
 # BENCHMARKS
