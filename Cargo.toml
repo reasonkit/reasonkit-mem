@@ -101,7 +101,9 @@ required-features = ["vdreamteam"]
 
 [dependencies]
 # Python Bindings (optional)
-pyo3 = { version = "0.27.2", features = ["extension-module"], optional = true }
+# Note: pyo3 0.23+ deprecated Python::with_gil and allow_threads (use attach/detach instead)
+# Pinned to 0.22.x until code is updated to use new API
+pyo3 = { version = "0.22", features = ["extension-module"], optional = true }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
