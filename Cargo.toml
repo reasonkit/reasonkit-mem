@@ -104,7 +104,7 @@ required-features = ["vdreamteam"]
 # Python Bindings (optional)
 # Note: pyo3 0.23+ deprecated Python::with_gil and allow_threads (use attach/detach instead)
 # Pinned to 0.22.x until code is updated to use new API
-pyo3 = { version = "0.22", features = ["extension-module"], optional = true }
+pyo3 = { version = "0.28", features = ["extension-module"], optional = true }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -113,7 +113,7 @@ serde_bytes = "0.11"
 
 # Binary serialization (faster than JSON for embeddings)
 # Note: bincode 2.0+ has completely new API, code uses 1.x serialize()/deserialize()
-bincode = "1.3"
+bincode = "3.0"
 
 # MessagePack serialization (compact binary format)
 rmp-serde = "1.3"
@@ -177,7 +177,7 @@ dirs = "6"
 ort = { version = "2.0.0-rc.11", optional = true }
 
 # HuggingFace tokenizers
-tokenizers = { version = "0.21", optional = true }
+tokenizers = { version = "0.22", optional = true }
 
 # NDArray for tensor operations (must match ort's ndarray version)
 ndarray = { version = "0.17", optional = true }
@@ -194,10 +194,10 @@ serde_yaml = { version = "0.9", optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"
-tempfile = "3.10"
+tempfile = "3.25"
 pretty_assertions = "1.4"
 criterion = { version = "0.8", features = ["async_tokio"] }
-proptest = "1.4"
+proptest = "1.10"
 
 # ============================================================================
 # FEATURES
