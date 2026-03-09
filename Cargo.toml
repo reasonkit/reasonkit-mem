@@ -174,7 +174,7 @@ crossbeam-utils = "0.8"
 dirs = "6"
 
 # ONNX Runtime for local embeddings (BGE-M3)
-ort = { version = "2.0.0-rc.11", optional = true }
+ort = { version = "2.0.0-rc.12", optional = true }
 
 # HuggingFace tokenizers
 tokenizers = { version = "0.22", optional = true }
