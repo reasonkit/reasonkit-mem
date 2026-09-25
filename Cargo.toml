@@ -13,9 +13,17 @@ readme = "README.md"
 keywords = ["vector-database", "rag", "embeddings", "semantic-search", "retrieval"]
 categories = ["database", "science", "data-structures", "algorithms"]
 
-# Explicit include list for crates.io package
+# Binaries are the explicit [[bin]] targets below and nothing else: a stray
+# src/bin/*.rs file must never become an installed binary on crates.io.
+autobins = false
+
+# Explicit include list for crates.io package. Cargo ignores `exclude` when
+# `include` is set, so scratch files are kept out with negations here.
 include = [
     "/src/**/*",
+    "!/src/bin/*",
+    "/src/bin/vdream_mcp.rs",
+    "/src/bin/vdream_cli.rs",
     "/benches/**/*",
     "/examples/**/*",
     "/Cargo.toml",
